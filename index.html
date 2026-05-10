@@ -540,7 +540,8 @@
 
             const chartTimeEl = document.getElementById('chart-update-time');
 
-            firebase.database().ref('history').limitToLast(1500).on('value', (snapshot) => {
+            // MEGOLDÁS: limitToLast(1500) -> limitToLast(6000), így az egész előző + mai nap is biztosan benne van
+            firebase.database().ref('history').limitToLast(6000).on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (chartTimeEl) chartTimeEl.textContent = `Frissítve: ${formatTime(new Date())}`;
 
@@ -1653,7 +1654,7 @@
                     const allKeys = Object.keys(STATIONS);
                     await Promise.allSettled(allKeys.map(k => fetchPwsStationData(k)));
                     
-                    archiveAllOnlineStations();
+                    // archiveAllOnlineStations(); // Ezt a sort kikapcsoltuk, mert a Google Apps Script ment a háttérben!
 
                     if (!STATIONS[activeDisplayStationKey].isOnline) {
                         const fallbackStation = allKeys.find(k => STATIONS[k].isOnline);
