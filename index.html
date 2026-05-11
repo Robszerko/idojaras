@@ -132,6 +132,16 @@
         .rain-event-closed.expanded .expand-icon { transform: rotate(180deg); }
         #live-rain-log-content { overflow-x: hidden; }
 
+        /* Egyedi belső görgetősáv az események lenyíló tartalmaihoz */
+        .scrollable-details::-webkit-scrollbar { width: 4px; }
+        .scrollable-details::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+        .scrollable-details::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+
+        /* SCROLLBAR A FŐ NAPLÓHOZ */
+        #live-rain-log-content::-webkit-scrollbar { width: 4px; }
+        #live-rain-log-content::-webkit-scrollbar-track { background: transparent; }
+        #live-rain-log-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
         /* METRICS ROW */
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; width: 100%; }
         .metric-item { background: rgba(0, 0, 0, 0.15); border: 1px solid var(--current-glass-border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; text-align: center; }
@@ -235,11 +245,6 @@
 
         .date-input { background: rgba(255,255,255,0.1); border: 1px solid var(--current-glass-border); color: white; padding: 6px; border-radius: 8px; font-family: inherit; font-size: 12px; cursor: pointer;}
         .date-input option { background: #111827; color: #ffffff; }
-
-        /* SCROLLBAR A NAPLÓHOZ */
-        #live-rain-log-content::-webkit-scrollbar { width: 4px; }
-        #live-rain-log-content::-webkit-scrollbar-track { background: transparent; }
-        #live-rain-log-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 
         @media (max-width: 600px) {
             .hero-card { flex-direction: column; text-align: center; }
@@ -695,11 +700,15 @@
             searchHistory();
         }
 
+        // --- OKOS, FOLYAMATOS ÉLŐ CSAPADÉKNAPLÓ GÖRGETHETŐ BELSŐ RÉSZEKKEL ---
         function renderLiveRainLog(allStationPoints) {
             const logBox = document.getElementById('live-rain-log-content');
             const totalBox = document.getElementById('live-rain-log-total');
             const rainCol = document.getElementById('hero-rain-col');
             if (!logBox || !totalBox || !rainCol) return;
+
+            // Növeljük a fő konténer magasságát is egy kicsit, hogy kényelmesebb legyen a görgetés
+            logBox.style.maxHeight = '300px';
 
             let events =[];
             let currentEvent = null;
@@ -748,13 +757,9 @@
                     let desc = rate > 0 ? getPrecipIntensityDescription(rate, currentEvent.isSnow).toLowerCase() : (currentEvent.isSnow ? 'hószállingózás' : 'csepergés');
                     let accRain = continuousTotal - currentEvent.startTotal;
                     
-                    if (desc !== currentEvent.lastDesc) {
-                        currentEvent.changes.push({ time: p.timestamp, desc: desc, val: accRain });
-                        currentEvent.lastDesc = desc;
-                    } else if (currentEvent.changes.length > 0) {
-                        currentEvent.changes[currentEvent.changes.length - 1].val = accRain;
-                    }
-                    
+                    // Mostantól BÁRMI történik az esemény alatt, azt külön sorként naplózzuk
+                    currentEvent.changes.push({ time: p.timestamp, desc: desc, val: accRain });
+                    currentEvent.lastDesc = desc;
                     currentEvent.lastTime = p.timestamp;
                     currentEvent.totalRain = accRain;
                 } else {
@@ -805,7 +810,7 @@
                         lastDay = chDay;
                     }
                     detailsHtml += `
-                        <div style="display:flex; justify-content:space-between; color: rgba(255,255,255,0.8);">
+                        <div style="display:flex; justify-content:space-between; color: rgba(255,255,255,0.8); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 3px;">
                             <span>${formatHourOnly(ch.time)} - ${ch.desc}</span>
                             <strong>${Number(ch.val).toFixed(1)} mm</strong>
                         </div>
@@ -819,7 +824,7 @@
                             <span><i class="fas fa-chevron-down expand-icon" style="margin-right:6px; font-size:10px; transition: transform 0.3s; color: var(--current-accent);"></i>${startTimeStr} - ${endTimeStr}</span>
                             <strong>${Number(ev.totalRain).toFixed(1)} mm</strong>
                         </div>
-                        <div class="rain-event-details" style="flex-direction:column; gap:4px; background:rgba(255,255,255,0.05); padding:6px 8px; font-size:10px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <div class="rain-event-details scrollable-details" style="flex-direction:column; gap:4px; background:rgba(255,255,255,0.05); padding:6px 8px; font-size:10px; border-top: 1px solid rgba(255,255,255,0.05); max-height: 150px; overflow-y: auto;">
                             ${detailsHtml}
                         </div>
                     </div>`;
@@ -831,15 +836,24 @@
                             <span style="color:var(--text-primary)">${Number(ev.totalRain).toFixed(1)} mm</span>
                         </div>
                     `;
+                    html += `<div class="scrollable-details" style="max-height: 150px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 4px;">`;
                     html += detailsHtml;
-                    html += `</div>`;
+                    html += `</div></div>`;
                 }
             });
 
             logBox.innerHTML = html;
             totalBox.textContent = (displayDailyTotal || 0).toFixed(1) + ' mm';
             
+            // Ha a felhasználó nincs benne a scrollolásban, görgessünk az aljára
             logBox.scrollTop = logBox.scrollHeight;
+            
+            // Az éppen aktív (utolsó) belső scrollbart is görgessük le az esemény aljára
+            const innerScrolls = logBox.querySelectorAll('.scrollable-details');
+            if (innerScrolls.length > 0) {
+                const lastInner = innerScrolls[innerScrolls.length - 1];
+                lastInner.scrollTop = lastInner.scrollHeight;
+            }
         }
 
         function calculateActualDailyStats(dataPoints) {
