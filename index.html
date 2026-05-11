@@ -293,7 +293,7 @@
         // --- 8 FŐ ÁLLOMÁS + 14 CSAPADÉKRADAR (KÉM) ÁLLOMÁS BŐVÍTÉSSEL ---
         const STATIONS = { 
             NYIREGYHAZI_UT: { id: 'INYREG26', name: 'Nyíregyházi út', displayName: 'Nyíregyházi út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
-            KERT_UTCA: { id: 'INYREG37', name: 'Kert utca', displayName: 'Kert u.', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
+            KERT_UTCA: { id: 'INYREG37', name: 'Kert utca', displayName: 'Kert u.', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null }, 
             KOSSUTH: { id: 'INYREG42', name: 'Kossuth út 50', displayName: 'Kossuth út 50', displayNameShort: 'Kossuth út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null }, 
             SOSTOHEGY: { id: 'INYREG20', name: 'Sóstóhegy (Állatpark)', displayName: 'Sóstóhegy', displayNameShort: 'Sóstóhegy', coords: { lat: 48.00, lon: 21.72 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
             BORBANYA: { id: 'INYREG30', name: 'Borbánya', displayName: 'Borbánya', displayNameShort: 'Borbánya', coords: { lat: 47.92, lon: 21.74 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
@@ -320,7 +320,6 @@
         };
 
         let activeDisplayStationKey = 'KERT_UTCA'; 
-        // METAR állapot bekerült a gyorsítótárba
         let cachedData = { displayPws: null, generalConditions: {}, sunCalc: null, sunTimes: null, metarCondition: null };
         let forecastCache = {};
         let isWeatherDisplayInitialized = false; 
@@ -422,8 +421,6 @@
         function mapIconCodeToHungarianText(iconCode, dayOrNight) { const isDay = dayOrNight === 'D'; const textMap = { 32: 'Napos', 36: 'Napos', 31: 'Tiszta ég', 33: 'Tiszta ég', 34: isDay ? 'Részben napos' : 'Részben felhős', 29: isDay ? 'Részben napos' : 'Részben felhős', 30: isDay ? 'Részben napos' : 'Részben felhős', 27: 'Felhős', 28: 'Felhős', 26: 'Borult', 11: 'Zápor', 12: 'Zápor', 40: 'Zápor', 39: isDay ? 'Zápor' : 'Éjjeli zápor', 45: isDay ? 'Zápor' : 'Éjjeli zápor', 3: 'Zivatar', 4: 'Zivatar', 37: 'Zivatar', 38: 'Zivatar', 47: 'Zivatar', 5: 'Havas eső', 6: 'Ónos eső', 7: 'Havas eső', 8: 'Ónos eső', 10: 'Ónos eső', 18: 'Havas eső', 13: 'Hózápor', 14: 'Hózápor', 15: 'Hófúvás', 16: 'Havazás', 41: 'Havazás', 42: 'Havazás', 43: 'Hófúvás', 46: 'Hózápor', 9: 'Permet / Szitálás', 19: 'Por', 20: 'Köd', 21: 'Pára', 22: 'Füst', 23: 'Szeles', 24: 'Szeles' }; return textMap[iconCode] || 'Ismeretlen'; }
         function mapTwcIconToFontAwesome(iconCode, dayOrNight) { const isDay = dayOrNight === 'D'; const iconMap = { 32:'fas fa-sun',36:'fas fa-sun',31:'fas fa-moon',33:'fas fa-moon',34:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',29:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',30:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',27:'fas fa-cloud',28:'fas fa-cloud',26:'fas fa-cloud',11:'fas fa-cloud-showers-heavy',12:'fas fa-cloud-showers-heavy',40:'fas fa-cloud-showers-heavy',39:isDay ?'fas fa-cloud-sun-rain':'fas fa-cloud-moon-rain',45:isDay ?'fas fa-cloud-sun-rain':'fas fa-cloud-moon-rain',3:'fas fa-cloud-bolt',4:'fas fa-cloud-bolt',37:'fas fa-cloud-bolt',38:'fas fa-cloud-bolt',47:'fas fa-cloud-bolt',5:'fas fa-snowflake',6:'fas fa-snowflake',7:'fas fa-snowflake',8:'fas fa-snowflake',10:'fas fa-cloud-sleet',18:'fas fa-smog',13:'fas fa-snowflake',14:'fas fa-snowflake',15:'fas fa-snowflake',16:'fas fa-snowflake',41:'fas fa-snowflake',42:'fas fa-snowflake',43:'fas fa-snowflake',46:'fas fa-snowflake',9:'fas fa-cloud-rain',19:'fas fa-smog',20:'fas fa-smog',21:'fas fa-smog',22:'fas fa-smog',23:'fas fa-wind',24:'fas fa-wind' }; return iconMap[iconCode] || 'fas fa-question-circle'; }
 
-        // --- ÚJ: NYÍREGYHÁZA REPÜLŐTÉR METAR ÁTALAKÍTÓ ---
-        // Ez szolgáltatja a legpontosabb létező (aviation-grade) égképet és felhőzetet.
         function parseMetarToHungarian(metarObj, isDay) {
             if (!metarObj) return null;
             let phrase = "";
@@ -475,7 +472,6 @@
         // --- ADATLEKÉRÉSEK (APIs) ---
         async function fetchMetarData() {
             try {
-                // LHNY = Nyíregyháza Airport hivatalos METAR lekérdezése
                 const res = await fetchWithTimeout('https://aviationweather.gov/api/data/metar?ids=LHNY&format=json');
                 if (res.ok) {
                     const data = await res.json();
@@ -569,8 +565,8 @@
                         windSpeed: st.data.metric.windSpeed,
                         pressure: st.data.metric.pressure,
                         uv: st.data.metric.uv !== undefined ? st.data.metric.uv : (st.data.uv || 0),
-                        precipTotal: st.data.metric.precipTotal,
-                        precipRate: st.data.metric.precipRate
+                        precipTotal: st.data.metric.precipTotal !== undefined ? st.data.metric.precipTotal : 0,
+                        precipRate: st.data.metric.precipRate !== undefined ? st.data.metric.precipRate : 0
                     });
                 }
             }
@@ -699,7 +695,6 @@
             searchHistory();
         }
 
-        // --- OKOS, FOLYAMATOS ÉLŐ CSAPADÉKNAPLÓ (Napváltás és visszamenőleges esőkezdet kezelésével) ---
         function renderLiveRainLog(allStationPoints) {
             const logBox = document.getElementById('live-rain-log-content');
             const totalBox = document.getElementById('live-rain-log-total');
@@ -1491,7 +1486,6 @@
             let isSnowing = false;
             let isZivatar = false;
 
-            // 1. MEGOLDÁS AZ "ÉGKÉPRE": Repülőtéri METAR adat elsőbbsége
             if (cachedData.metarCondition) {
                 const metar = parseMetarToHungarian(cachedData.metarCondition, gen.dayOrNight === 'D');
                 if (metar) {
@@ -1501,7 +1495,6 @@
                     isZivatar = metar.isZivatar;
                 }
             } else {
-                // TWC (Weather.com) másodlagos forrás
                 conditionText = gen.wxPhraseLong || mapIconCodeToHungarianText(gen.iconCode, gen.dayOrNight);
                 iconClass = mapTwcIconToFontAwesome(gen.iconCode, gen.dayOrNight);
                 isSnowing = SNOW_ICON_CODES.includes(gen.iconCode);
@@ -1509,7 +1502,6 @@
                 isZivatar = baseLower.includes('zivatar') ||[3, 4, 37, 38, 47].includes(gen.iconCode);
             }
 
-            // 2. MEGOLDÁS (SMART PWS OVERRIDE): Ha az API azt hazudja, hogy esik, de a saját mérőd száraz
             const isApiRaining = /eső|zápor|szitálás|zivatar|havaz|permet/i.test(conditionText);
             if (isApiRaining && (!obs.precipRate || obs.precipRate === 0)) {
                 conditionText = "Felhős"; 
@@ -1529,9 +1521,8 @@
                 isZivatar = false;
             }
 
-            // 3. Ha viszont a VALÓSÁGBAN (PWS) esik, az mindent felülír!
             if (obs.precipRate > 0) {
-                isSnowing = obs.temp !== null && obs.temp < 2; // Saját hőmérséklet alapú hó-detektálás
+                isSnowing = obs.temp !== null && obs.temp < 2; 
                 if (isSnowing) {
                     if (obs.precipRate <= 0.5) { conditionText = "Hószállingózás"; iconClass = "fas fa-snowflake"; }
                     else if (obs.precipRate <= 1.5) { conditionText = "Gyenge havazás"; iconClass = "fas fa-snowflake"; }
@@ -1608,7 +1599,6 @@
                         isSnow = s.data.metric.temp < 2;
                     }
 
-                    // A kérésnek megfelelően mm/h nélkül, radar leállás időponttal
                     let footerText = '';
                     if (raining) {
                         footerText = `<span style="color: var(--precip-color); font-weight: 800;">Most: ${getPrecipIntensityDescription(s.data.metric.precipRate, isSnow)}</span>`;
@@ -1654,7 +1644,6 @@
             let startIdx = full.findIndex(h => new Date(h.time).getTime() >= currentHourStart);
             if (startIdx === -1) startIdx = 0;
 
-            // NAPI VÁRHATÓ ÖSSZCSAPADÉK A MAI NAPRA ÁTHELYEZVE IDE
             let totalQpfToday = 0;
             full.forEach(h => {
                 const hTime = new Date(h.time).getTime();
@@ -1931,7 +1920,6 @@
 
             const coords = STATIONS[activeDisplayStationKey].coords;
             
-            // Open-Meteo helyett bejött a hivatalos METAR lekérés!
             await Promise.allSettled([
                 fetchGeneralConditionsData(coords.lat, coords.lon).then(d => { if(d) cachedData.generalConditions = d; }),
                 fetchMetarData(),
@@ -1993,8 +1981,8 @@
                                     windSpeed: st.data.metric.windSpeed,
                                     pressure: st.data.metric.pressure,
                                     uv: st.data.metric.uv !== undefined ? st.data.metric.uv : (st.data.uv || 0),
-                                    precipTotal: st.data.metric.precipTotal,
-                                    precipRate: st.data.metric.precipRate
+                                    precipTotal: st.data.metric.precipTotal !== undefined ? st.data.metric.precipTotal : 0,
+                                    precipRate: st.data.metric.precipRate !== undefined ? st.data.metric.precipRate : 0
                                 });
                             }
                         }
@@ -2021,7 +2009,6 @@
                 }
             }, 60 * 1000); 
 
-            // API Frissítés 2 percenként a General Data-ra és a METAR-ra
             setInterval(async () => {
                 if (isGenUpdating) return;
                 isGenUpdating = true;
