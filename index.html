@@ -320,12 +320,13 @@
         };
 
         let activeDisplayStationKey = 'KERT_UTCA'; 
-        let cachedData = { displayPws: null, generalConditions: {}, sunCalc: null, sunTimes: null, omCondition: null };
+        // METAR állapot bekerült a gyorsítótárba
+        let cachedData = { displayPws: null, generalConditions: {}, sunCalc: null, sunTimes: null, metarCondition: null };
         let forecastCache = {};
         let isWeatherDisplayInitialized = false; 
         let forecastPage = 0;
         let historyChartInstance = null;
-        let windowGlobalHistoryCache =[]; // GLOBÁLIS CACHE a history adatbázishoz
+        let windowGlobalHistoryCache =[]; 
 
         const displayableStations =['NYIREGYHAZI_UT', 'KERT_UTCA', 'KOSSUTH', 'SOSTOHEGY', 'BORBANYA', 'OROS_DERUS', 'NAGYHALASZ', 'SZAKOLY'];
 
@@ -421,38 +422,72 @@
         function mapIconCodeToHungarianText(iconCode, dayOrNight) { const isDay = dayOrNight === 'D'; const textMap = { 32: 'Napos', 36: 'Napos', 31: 'Tiszta ég', 33: 'Tiszta ég', 34: isDay ? 'Részben napos' : 'Részben felhős', 29: isDay ? 'Részben napos' : 'Részben felhős', 30: isDay ? 'Részben napos' : 'Részben felhős', 27: 'Felhős', 28: 'Felhős', 26: 'Borult', 11: 'Zápor', 12: 'Zápor', 40: 'Zápor', 39: isDay ? 'Zápor' : 'Éjjeli zápor', 45: isDay ? 'Zápor' : 'Éjjeli zápor', 3: 'Zivatar', 4: 'Zivatar', 37: 'Zivatar', 38: 'Zivatar', 47: 'Zivatar', 5: 'Havas eső', 6: 'Ónos eső', 7: 'Havas eső', 8: 'Ónos eső', 10: 'Ónos eső', 18: 'Havas eső', 13: 'Hózápor', 14: 'Hózápor', 15: 'Hófúvás', 16: 'Havazás', 41: 'Havazás', 42: 'Havazás', 43: 'Hófúvás', 46: 'Hózápor', 9: 'Permet / Szitálás', 19: 'Por', 20: 'Köd', 21: 'Pára', 22: 'Füst', 23: 'Szeles', 24: 'Szeles' }; return textMap[iconCode] || 'Ismeretlen'; }
         function mapTwcIconToFontAwesome(iconCode, dayOrNight) { const isDay = dayOrNight === 'D'; const iconMap = { 32:'fas fa-sun',36:'fas fa-sun',31:'fas fa-moon',33:'fas fa-moon',34:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',29:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',30:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',27:'fas fa-cloud',28:'fas fa-cloud',26:'fas fa-cloud',11:'fas fa-cloud-showers-heavy',12:'fas fa-cloud-showers-heavy',40:'fas fa-cloud-showers-heavy',39:isDay ?'fas fa-cloud-sun-rain':'fas fa-cloud-moon-rain',45:isDay ?'fas fa-cloud-sun-rain':'fas fa-cloud-moon-rain',3:'fas fa-cloud-bolt',4:'fas fa-cloud-bolt',37:'fas fa-cloud-bolt',38:'fas fa-cloud-bolt',47:'fas fa-cloud-bolt',5:'fas fa-snowflake',6:'fas fa-snowflake',7:'fas fa-snowflake',8:'fas fa-snowflake',10:'fas fa-cloud-sleet',18:'fas fa-smog',13:'fas fa-snowflake',14:'fas fa-snowflake',15:'fas fa-snowflake',16:'fas fa-snowflake',41:'fas fa-snowflake',42:'fas fa-snowflake',43:'fas fa-snowflake',46:'fas fa-snowflake',9:'fas fa-cloud-rain',19:'fas fa-smog',20:'fas fa-smog',21:'fas fa-smog',22:'fas fa-smog',23:'fas fa-wind',24:'fas fa-wind' }; return iconMap[iconCode] || 'fas fa-question-circle'; }
 
-        function getOpenMeteoCondition(wmo, isDay) {
-            let phrase = "Ismeretlen"; let iconClass = "fas fa-cloud"; let isSnowing = false; let isZapor = false; let isZivatar = false;
-            switch(wmo) {
-                case 0: phrase = isDay ? "Napos" : "Tiszta ég"; iconClass = isDay ? "fas fa-sun" : "fas fa-moon"; break;
-                case 1: phrase = isDay ? "Derült" : "Tiszta ég"; iconClass = isDay ? "fas fa-sun" : "fas fa-moon"; break;
-                case 2: phrase = "Részben felhős"; iconClass = isDay ? "fas fa-cloud-sun" : "fas fa-cloud-moon"; break;
-                case 3: phrase = "Borult"; iconClass = "fas fa-cloud"; break;
-                case 45: case 48: phrase = "Ködös"; iconClass = "fas fa-smog"; break;
-                case 51: phrase = "Szitálás"; iconClass = "fas fa-cloud-rain"; break;
-                case 53: phrase = "Mérsékelt szitálás"; iconClass = "fas fa-cloud-rain"; break;
-                case 55: phrase = "Erős szitálás"; iconClass = "fas fa-cloud-rain"; break;
-                case 56: case 57: phrase = "Ónos szitálás"; iconClass = "fas fa-cloud-sleet"; isSnowing = true; break;
-                case 61: phrase = "Gyenge eső"; iconClass = "fas fa-cloud-rain"; break;
-                case 63: phrase = "Mérsékelt eső"; iconClass = "fas fa-cloud-rain"; break;
-                case 65: phrase = "Erős eső"; iconClass = "fas fa-cloud-showers-heavy"; break;
-                case 66: case 67: phrase = "Ónos eső"; iconClass = "fas fa-cloud-sleet"; isSnowing = true; break;
-                case 71: phrase = "Gyenge havazás"; iconClass = "fas fa-snowflake"; isSnowing = true; break;
-                case 73: phrase = "Havazás"; iconClass = "fas fa-snowflake"; isSnowing = true; break;
-                case 75: phrase = "Erős havazás"; iconClass = "fas fa-snowflake"; isSnowing = true; break;
-                case 77: phrase = "Hószállingózás"; iconClass = "fas fa-snowflake"; isSnowing = true; break;
-                case 80: phrase = "Gyenge zápor"; iconClass = isDay ? "fas fa-cloud-sun-rain" : "fas fa-cloud-moon-rain"; isZapor = true; break;
-                case 81: phrase = "Zápor"; iconClass = "fas fa-cloud-showers-heavy"; isZapor = true; break;
-                case 82: phrase = "Heves zápor"; iconClass = "fas fa-cloud-showers-heavy"; isZapor = true; break;
-                case 85: phrase = "Hózápor"; iconClass = "fas fa-snowflake"; isZapor = true; isSnowing = true; break;
-                case 86: phrase = "Erős hózápor"; iconClass = "fas fa-snowflake"; isZapor = true; isSnowing = true; break;
-                case 95: phrase = "Zivatar"; iconClass = "fas fa-cloud-bolt"; isZivatar = true; break;
-                case 96: case 99: phrase = "Heves zivatar"; iconClass = "fas fa-cloud-bolt"; isZivatar = true; break;
+        // --- ÚJ: NYÍREGYHÁZA REPÜLŐTÉR METAR ÁTALAKÍTÓ ---
+        // Ez szolgáltatja a legpontosabb létező (aviation-grade) égképet és felhőzetet.
+        function parseMetarToHungarian(metarObj, isDay) {
+            if (!metarObj) return null;
+            let phrase = "";
+            let iconClass = "fas fa-cloud";
+            let isSnowing = false;
+            let isZivatar = false;
+
+            if (metarObj.wxString) {
+                const wx = metarObj.wxString.toUpperCase();
+                if (wx.includes('TS')) { phrase = "Zivatar"; iconClass = "fas fa-cloud-bolt"; isZivatar = true; }
+                else if (wx.includes('SHSN') || wx.includes('SHGS')) { phrase = "Hózápor"; iconClass = "fas fa-snowflake"; isSnowing = true; }
+                else if (wx.includes('SHRA') || wx.includes('SH')) { phrase = "Zápor"; iconClass = "fas fa-cloud-showers-heavy"; }
+                else if (wx.includes('SN')) { phrase = "Havazás"; iconClass = "fas fa-snowflake"; isSnowing = true; }
+                else if (wx.includes('DZ')) { phrase = "Szitálás"; iconClass = "fas fa-cloud-rain"; }
+                else if (wx.includes('RA')) { phrase = "Eső"; iconClass = "fas fa-cloud-rain"; }
+                else if (wx.includes('FG')) { phrase = "Köd"; iconClass = "fas fa-smog"; }
+                else if (wx.includes('BR')) { phrase = "Pára"; iconClass = "fas fa-smog"; }
+                
+                if (phrase) {
+                    if (wx.includes('-')) phrase = "Gyenge " + phrase.toLowerCase();
+                    if (wx.includes('+')) phrase = "Erős " + phrase.toLowerCase();
+                    phrase = phrase.charAt(0).toUpperCase() + phrase.slice(1);
+                }
             }
-            return { phrase, iconClass, isSnowing, isZapor, isZivatar };
+            
+            if (!phrase) {
+                let maxCover = "CLR";
+                if (metarObj.rawOb && metarObj.rawOb.includes('CAVOK')) {
+                    maxCover = "CLR";
+                } else if (metarObj.clouds && metarObj.clouds.length > 0) {
+                    const covers = metarObj.clouds.map(c => c.cover);
+                    if (covers.includes('OVC')) maxCover = 'OVC';
+                    else if (covers.includes('BKN')) maxCover = 'BKN';
+                    else if (covers.includes('SCT')) maxCover = 'SCT';
+                    else if (covers.includes('FEW')) maxCover = 'FEW';
+                }
+                
+                switch(maxCover) {
+                    case 'OVC': phrase = "Borult"; iconClass = "fas fa-cloud"; break;
+                    case 'BKN': phrase = "Erősen felhős"; iconClass = "fas fa-cloud"; break;
+                    case 'SCT': phrase = "Részben felhős"; iconClass = isDay ? "fas fa-cloud-sun" : "fas fa-cloud-moon"; break;
+                    case 'FEW': phrase = "Gyengén felhős"; iconClass = isDay ? "fas fa-cloud-sun" : "fas fa-cloud-moon"; break;
+                    case 'CLR': case 'SKC': default: phrase = isDay ? "Derült" : "Tiszta ég"; iconClass = isDay ? "fas fa-sun" : "fas fa-moon"; break;
+                }
+            }
+            return { phrase, iconClass, isSnowing, isZivatar };
         }
 
         // --- ADATLEKÉRÉSEK (APIs) ---
+        async function fetchMetarData() {
+            try {
+                // LHNY = Nyíregyháza Airport hivatalos METAR lekérdezése
+                const res = await fetchWithTimeout('https://aviationweather.gov/api/data/metar?ids=LHNY&format=json');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        cachedData.metarCondition = data[0];
+                    }
+                }
+            } catch(e) {
+                console.warn("METAR lekérési hiba:", e);
+            }
+        }
+
         async function fetchAdvancedSunCalcData(lat, lon) { 
             const now = new Date(); 
             cachedData.sunTimes = SunCalc.getTimes(now, lat, lon); 
@@ -505,27 +540,9 @@
             } 
         }
 
-        async function fetchOpenMeteoCondition(lat, lon) {
-            try {
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,is_day&timezone=Europe%2FBudapest`;
-                const response = await fetchWithTimeout(url);
-                if (response.ok) {
-                    const data = await response.json();
-                    cachedData.omCondition = {
-                        weatherCode: data.current.weather_code,
-                        isDay: data.current.is_day === 1
-                    };
-                }
-            } catch (error) {
-                console.error("Hiba az Open-Meteo lekérésnél:", error);
-            }
-        }
-
         // --- BIZTOSÍTOTT GRAFIKON BETÖLTŐ & VALÓS NAPI ADATOK ---
-        
-        // Segédfüggvény, ami összevonja a Firebase cache-t az éppen aktuális PWS méréssel
         function getEnrichedHistory(targetKey) {
-            if (!windowGlobalHistoryCache) return [];
+            if (!windowGlobalHistoryCache) return[];
             
             const targetId = STATIONS[targetKey].id;
             let pts = windowGlobalHistoryCache.filter(p => 
@@ -533,7 +550,6 @@
             );
             pts.sort((a, b) => a.timestamp - b.timestamp);
             
-            // Élő adat hozzáadása, ha az állomás él, és a mérés frissebb mint a cache
             const st = STATIONS[targetKey];
             if (st && st.isOnline && st.data) {
                 let liveTs = Date.now();
@@ -544,7 +560,6 @@
                 
                 const lastPtTs = pts.length > 0 ? pts[pts.length - 1].timestamp : 0;
                 
-                // Ha legalább 2 perccel frissebb az élő adat
                 if (pts.length === 0 || liveTs > lastPtTs + 120000) {
                     pts.push({
                         timestamp: liveTs,
@@ -563,20 +578,15 @@
         }
 
         function loadHistoricalDataFromFirebase() {
-            // Emelt limit, masszív stabilitás
             firebase.database().ref('history').limitToLast(20000).on('value', (snapshot) => {
                 let allPoints =[];
-                // GARANTÁLT KRONOLÓGIAI BEMENET A FIREBASE-BŐL
                 snapshot.forEach(child => {
                     allPoints.push(child.val());
                 });
-                
                 allPoints.sort((a, b) => a.timestamp - b.timestamp);
                 
-                // Mentsük le a Firebase adatokat
                 windowGlobalHistoryCache = allPoints;
                 
-                // Indítsuk el a renderelést
                 processMainStationHistory();
                 processChartStationHistory();
                 
@@ -595,7 +605,6 @@
             const targetKey = activeDisplayStationKey;
             let filteredPoints = getEnrichedHistory(targetKey);
 
-            // OFFLINE ÁLLOMÁS UTOLSÓ ÉSZLELÉSE - LOGIKA (Hero Panel Banner):
             const bannerEl = document.getElementById('offline-warning-banner');
             const lastSeenEl = document.getElementById('offline-last-seen');
             if (STATIONS[targetKey] && !STATIONS[targetKey].isOnline && filteredPoints.length > 0) {
@@ -625,7 +634,6 @@
             const todayStr = new Date().toLocaleDateString("hu-HU");
             let todayPoints = filteredPoints.filter(p => new Date(p.timestamp).toLocaleDateString("hu-HU") === todayStr);
 
-            // --- 00:00 - 23:59 NAPI GRAFIKON FELÉPÍTÉSE (Félórás rácspontokkal a szellősségért) ---
             const nowObj = new Date();
             const y = nowObj.getFullYear();
             const m = nowObj.getMonth();
@@ -691,7 +699,7 @@
             searchHistory();
         }
 
-        // --- OKOS, FOLYAMATOS ÉLŐ CSAPADÉKNAPLÓ (Napváltás kezelésével) ---
+        // --- OKOS, FOLYAMATOS ÉLŐ CSAPADÉKNAPLÓ (Napváltás és visszamenőleges esőkezdet kezelésével) ---
         function renderLiveRainLog(allStationPoints) {
             const logBox = document.getElementById('live-rain-log-content');
             const totalBox = document.getElementById('live-rain-log-total');
@@ -703,7 +711,6 @@
             let prevTotal = 0;
             let offset = 0; 
 
-            // TÖRTÉNELMI ÉS ÉLŐ ADATOK EGYÜTTES FELDOLGOZÁSA
             for (let i = 0; i < allStationPoints.length; i++) {
                 let p = allStationPoints[i];
                 let rawTotal = p.precipTotal || 0;
@@ -712,26 +719,39 @@
                     offset += prevTotal;
                 }
                 let continuousTotal = rawTotal + offset;
+                let inc = continuousTotal - (prevTotal + offset);
+                if (inc < 0) inc = 0;
                 prevTotal = rawTotal;
                 
                 let rate = p.precipRate || 0;
-                let temp = p.temp !== undefined && p.temp !== null ? p.temp : 10;
-                let isSnow = temp < 2;
-                let desc = getPrecipIntensityDescription(rate, isSnow).toLowerCase();
+                let isRainingNow = rate > 0 || inc > 0;
                 
-                if (rate > 0) {
+                if (isRainingNow) {
                     if (!currentEvent) {
+                        let fudgeMs = 300000; 
+                        if (rate > 5) fudgeMs = 60000; 
+                        else if (rate > 2) fudgeMs = 180000; 
+                        else if (rate > 0.5) fudgeMs = 300000; 
+                        else fudgeMs = 480000; 
+
+                        let st = p.timestamp - fudgeMs;
+                        if (events.length > 0 && st <= events[events.length-1].end) {
+                            st = events[events.length-1].end + 60000;
+                        }
+
                         currentEvent = { 
-                            start: p.timestamp, 
+                            start: st, 
                             end: null, 
-                            startTotal: continuousTotal, 
+                            startTotal: continuousTotal - inc, 
                             changes:[], 
                             lastDesc: null, 
-                            isSnow: isSnow 
+                            isSnow: (p.temp !== undefined && p.temp !== null ? p.temp : 10) < 2,
+                            lastTime: p.timestamp
                         };
                     }
+                    
+                    let desc = rate > 0 ? getPrecipIntensityDescription(rate, currentEvent.isSnow).toLowerCase() : (currentEvent.isSnow ? 'hószállingózás' : 'csepergés');
                     let accRain = continuousTotal - currentEvent.startTotal;
-                    if (accRain < 0) accRain = 0;
                     
                     if (desc !== currentEvent.lastDesc) {
                         currentEvent.changes.push({ time: p.timestamp, desc: desc, val: accRain });
@@ -739,11 +759,12 @@
                     } else if (currentEvent.changes.length > 0) {
                         currentEvent.changes[currentEvent.changes.length - 1].val = accRain;
                     }
+                    
+                    currentEvent.lastTime = p.timestamp;
+                    currentEvent.totalRain = accRain;
                 } else {
                     if (currentEvent) {
-                        currentEvent.end = p.timestamp;
-                        currentEvent.totalRain = continuousTotal - currentEvent.startTotal;
-                        if (currentEvent.totalRain < 0) currentEvent.totalRain = 0;
+                        currentEvent.end = currentEvent.lastTime;
                         events.push(currentEvent);
                         currentEvent = null;
                     }
@@ -751,8 +772,6 @@
             }
 
             if (currentEvent) {
-                currentEvent.totalRain = prevTotal - currentEvent.startTotal;
-                if (currentEvent.totalRain < 0) currentEvent.totalRain = 0;
                 events.push(currentEvent);
             }
 
@@ -793,7 +812,7 @@
                     detailsHtml += `
                         <div style="display:flex; justify-content:space-between; color: rgba(255,255,255,0.8);">
                             <span>${formatHourOnly(ch.time)} - ${ch.desc}</span>
-                            <strong>${ch.val.toFixed(1)} mm</strong>
+                            <strong>${Number(ch.val).toFixed(1)} mm</strong>
                         </div>
                     `;
                 });
@@ -803,7 +822,7 @@
                     <div class="rain-event-closed" onclick="this.classList.toggle('expanded')" style="background:rgba(0,0,0,0.25); border-radius:6px; border-left: 2px solid var(--precip-color); margin-bottom: 5px; cursor: pointer; overflow: hidden; transition: all 0.3s ease;">
                         <div style="display:flex; justify-content:space-between; padding:6px 8px; align-items: center; user-select: none;">
                             <span><i class="fas fa-chevron-down expand-icon" style="margin-right:6px; font-size:10px; transition: transform 0.3s; color: var(--current-accent);"></i>${startTimeStr} - ${endTimeStr}</span>
-                            <strong>${ev.totalRain.toFixed(1)} mm</strong>
+                            <strong>${Number(ev.totalRain).toFixed(1)} mm</strong>
                         </div>
                         <div class="rain-event-details" style="flex-direction:column; gap:4px; background:rgba(255,255,255,0.05); padding:6px 8px; font-size:10px; border-top: 1px solid rgba(255,255,255,0.05);">
                             ${detailsHtml}
@@ -814,7 +833,7 @@
                     html += `
                         <div style="display:flex; justify-content:space-between; font-weight: bold; color: #fff; margin-bottom: 4px; font-size:12px;">
                             <span><i class="fas fa-cloud-showers-heavy"></i> Folyamatban (${startTimeStr} óta)</span>
-                            <span style="color:var(--text-primary)">${ev.totalRain.toFixed(1)} mm</span>
+                            <span style="color:var(--text-primary)">${Number(ev.totalRain).toFixed(1)} mm</span>
                         </div>
                     `;
                     html += detailsHtml;
@@ -869,7 +888,6 @@
             }
         }
 
-        // --- ÚJ FUNKCIÓ: Vissza a mai naphoz naptár gomb ---
         function resetToToday() {
             const datePicker = document.getElementById('history-date-picker');
             if (datePicker) {
@@ -891,7 +909,8 @@
             const targetId = STATIONS[targetKey].id;
             const isOnline = STATIONS[targetKey].isOnline;
             
-            const selectedDateObj = new Date(dateVal);
+            const dateParts = dateVal.split('-');
+            const selectedDateObj = new Date(dateParts[0], parseInt(dateParts[1]) - 1, dateParts[2], 0, 0, 0);
             const selectedDateString = selectedDateObj.toLocaleDateString("hu-HU");
             const todayString = new Date().toLocaleDateString("hu-HU");
 
@@ -902,11 +921,9 @@
             try {
                 let allStationPoints =[];
 
-                // OKOSÍTÁS: Ha a mai napra keresünk, a valós idejű, élő befecskendezéssel feltuningolt cache-ből dolgozunk!
                 if (selectedDateString === todayString && windowGlobalHistoryCache && windowGlobalHistoryCache.length > 0) {
                     allStationPoints = getEnrichedHistory(targetKey);
                 } else {
-                    // Régebbi nap esetén letöltjük a kért archívumot a Firebaseről
                     const snap = await firebase.database().ref('history').once('value'); 
                     const data = snap.val(); 
                     if(!data) {
@@ -916,16 +933,13 @@
                     let tempPoints =[];
                     snap.forEach(child => { tempPoints.push(child.val()); });
                     
-                    // Szűrünk az állomásra
                     allStationPoints = tempPoints.filter(p => p.stationId === targetId || p.stationId === targetKey || p.stationInternalId === targetId);
                     allStationPoints.sort((a,b) => a.timestamp - b.timestamp);
                 }
                 
-                // Kereséshez és utolsó ponthoz csökkenő sorrend a kiíráshoz
-                let descendingPoints =[...allStationPoints].sort((a,b) => b.timestamp - a.timestamp);
+                let descendingPoints = [...allStationPoints].sort((a,b) => b.timestamp - a.timestamp);
                 const lastPt = descendingPoints[0];
 
-                // --- OFFLINE TÁJÉKOZTATÁS A TÁBLÁZAT FELETT ---
                 const warningBox = document.getElementById('table-offline-warning');
                 if (warningBox) {
                     if (!isOnline) {
@@ -940,10 +954,46 @@
                     }
                 }
 
-                // Szűrés a kiválasztott dátumra
                 const dailyPoints = descendingPoints.filter(p => {
                     const pDateString = new Date(p.timestamp).toLocaleDateString("hu-HU");
                     return (pDateString === selectedDateString) || (p.datum && p.datum.includes(selectedDateString));
+                });
+
+                let dayStartMs = selectedDateObj.getTime();
+                let pointsBeforeDay = allStationPoints.filter(p => p.timestamp < dayStartMs).sort((a,b) => a.timestamp - b.timestamp);
+                let prevRaw = pointsBeforeDay.length > 0 ? (pointsBeforeDay[pointsBeforeDay.length - 1].precipTotal || 0) : 0;
+                
+                let preciseDailyAcc = 0;
+                let wasRainingForward = false;
+                
+                let chronologicalDaily =[...dailyPoints].sort((a,b) => a.timestamp - b.timestamp);
+                
+                chronologicalDaily.forEach(p => {
+                    let raw = p.precipTotal || 0;
+                    let diff = raw - prevRaw;
+                    
+                    if (diff > 0) {
+                        preciseDailyAcc += diff;
+                    } else if (diff < 0) {
+                        preciseDailyAcc += raw;
+                    }
+                    
+                    p.displayPrecip = preciseDailyAcc;
+                    
+                    let rate = p.precipRate || 0;
+                    let isRainingForward = (rate > 0 || diff > 0);
+                    
+                    if (isRainingForward) {
+                        p.rainState = 'raining';
+                        wasRainingForward = true;
+                    } else if (wasRainingForward) {
+                        p.rainState = 'stopped';
+                        wasRainingForward = false;
+                    } else {
+                        p.rainState = 'none';
+                    }
+
+                    prevRaw = raw;
                 });
 
                 const midDay = new Date(selectedDateObj.getTime());
@@ -962,8 +1012,17 @@
                         const nextP = dailyPoints[i+1]; 
                         
                         const timeStr = new Date(p.timestamp).toLocaleTimeString('hu-HU', {hour: '2-digit', minute:'2-digit'});
-                        let precipHtml = `<span style="${p.precipTotal > 0 ? 'color: var(--precip-color); font-weight: bold;' : ''}">${p.precipTotal || 0} mm</span>`;
-                        if (p.precipRate && p.precipRate > 0) { precipHtml += `<br><span style="font-size: 10px; color: var(--text-secondary); opacity: 0.9;">${p.precipRate} mm/h<br>${getPrecipIntensityDescription(p.precipRate, false)}</span>`; }
+                        
+                        let precipValToShow = p.displayPrecip !== undefined ? p.displayPrecip : (p.precipTotal || 0);
+                        let precipHtml = `<span style="${precipValToShow > 0 ? 'color: var(--precip-color); font-weight: bold;' : ''}">${precipValToShow.toFixed(1)} mm</span>`;
+                        
+                        if (p.rainState === 'raining') {
+                            let isSnow = p.temp !== null && p.temp < 2;
+                            let desc = p.precipRate > 0 ? getPrecipIntensityDescription(p.precipRate, isSnow) : (isSnow ? 'Hószállingózás' : 'Csepergés / Szitálás');
+                            precipHtml += `<br><span style="font-size: 10px; color: var(--text-secondary); opacity: 0.9;">${desc}</span>`;
+                        } else if (p.rainState === 'stopped') {
+                            precipHtml += `<br><span style="font-size: 10px; color: #4ade80; font-weight: bold; opacity: 0.9;">Csapadék elállt</span>`;
+                        }
 
                         html += `
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;">
@@ -988,13 +1047,20 @@
                         }
                     }
                 } else {
-                    // Ha NINCS adat a mai napra, de OFFLINE és van egyáltalán korábbi mérése
                     if (!isOnline && lastPt) {
                         html = `<tr><td colspan="7" style="text-align:center; padding: 20px; color: #fca5a5; background: rgba(239, 68, 68, 0.05);">Ezen a napon nem érkezett adat. Jelenleg a(z) ${STATIONS[targetKey].displayNameShort || STATIONS[targetKey].displayName} állomás <strong>OFFLINE</strong>.<br>Az utolsó ismert sikeres mérés (${formatLastSeen(lastPt.timestamp)}) adatai:</td></tr>`;
                         
                         const timeStr = new Date(lastPt.timestamp).toLocaleTimeString('hu-HU', {hour: '2-digit', minute:'2-digit'});
-                        let precipHtml = `<span style="${lastPt.precipTotal > 0 ? 'color: var(--precip-color); font-weight: bold;' : ''}">${lastPt.precipTotal || 0} mm</span>`;
-                        if (lastPt.precipRate && lastPt.precipRate > 0) { precipHtml += `<br><span style="font-size: 10px; color: var(--text-secondary); opacity: 0.9;">${lastPt.precipRate} mm/h<br>${getPrecipIntensityDescription(lastPt.precipRate, false)}</span>`; }
+                        let precipValToShow = lastPt.displayPrecip !== undefined ? lastPt.displayPrecip : (lastPt.precipTotal || 0);
+                        let precipHtml = `<span style="${precipValToShow > 0 ? 'color: var(--precip-color); font-weight: bold;' : ''}">${precipValToShow.toFixed(1)} mm</span>`;
+                        
+                        if (lastPt.rainState === 'raining') {
+                            let isSnow = lastPt.temp !== null && lastPt.temp < 2;
+                            let desc = lastPt.precipRate > 0 ? getPrecipIntensityDescription(lastPt.precipRate, isSnow) : (isSnow ? 'Hószállingózás' : 'Csepergés / Szitálás');
+                            precipHtml += `<br><span style="font-size: 10px; color: var(--text-secondary); opacity: 0.9;">${desc}</span>`;
+                        } else if (lastPt.rainState === 'stopped') {
+                            precipHtml += `<br><span style="font-size: 10px; color: #4ade80; font-weight: bold; opacity: 0.9;">Csapadék elállt</span>`;
+                        }
 
                         html += `
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(239, 68, 68, 0.15);">
@@ -1192,9 +1258,14 @@
 
                 <!-- ÓRÁS CSAPADÉKESÉLY -->
                 <div class="glass-card">
-                    <div class="glass-card-title">
-                        <div class="glass-card-title-left"><i class="fas fa-cloud-rain"></i> <span id="title-precip-chance">Órás Csapadékesély</span></div>
-                        <span class="card-update-time" id="precip-chance-update-time">--:--</span>
+                    <div class="forecast-header" style="margin-bottom: 12px;">
+                        <div class="forecast-header-top">
+                            <div class="glass-card-title" style="margin:0;">
+                                <div class="glass-card-title-left"><i class="fas fa-cloud-rain"></i> <span id="title-precip-chance">Órás Csapadékesély</span></div>
+                                <span class="card-update-time" style="margin-left: 10px;" id="precip-chance-update-time">--:--</span>
+                            </div>
+                            <div class="forecast-summary-text" id="precip-chance-summary-text" style="display: none; color: var(--precip-color);">--</div>
+                        </div>
                     </div>
                     <div class="precip-chance-container" id="precip-chance-grid">
                         <!-- JS generálja a részletes esélyt -->
@@ -1336,7 +1407,7 @@
                 try {
                     const newGen = await fetchGeneralConditionsData(st.coords.lat, st.coords.lon);
                     if (newGen) cachedData.generalConditions = newGen;
-                    await fetchOpenMeteoCondition(st.coords.lat, st.coords.lon);
+                    await fetchMetarData();
                     const newSun = await fetchAdvancedSunCalcData(st.coords.lat, st.coords.lon);
                     if (newSun) cachedData.sunCalc = newSun;
                 } catch (e) {}
@@ -1344,7 +1415,6 @@
                 await fetchAndDisplayForecastsForStation(key);
                 compileAndRenderDisplayData(); 
                 
-                // OKOSÍTÁS: Ha fent váltunk állomást, az alsó táblázat is szinkronban kövesse le!
                 const hp = document.getElementById('history-station-picker');
                 if (hp) {
                     hp.value = activeDisplayStationKey;
@@ -1421,13 +1491,17 @@
             let isSnowing = false;
             let isZivatar = false;
 
-            if (cachedData.omCondition) {
-                const om = getOpenMeteoCondition(cachedData.omCondition.weatherCode, cachedData.omCondition.isDay);
-                conditionText = om.phrase;
-                iconClass = om.iconClass;
-                isSnowing = om.isSnowing;
-                isZivatar = om.isZivatar;
+            // 1. MEGOLDÁS AZ "ÉGKÉPRE": Repülőtéri METAR adat elsőbbsége
+            if (cachedData.metarCondition) {
+                const metar = parseMetarToHungarian(cachedData.metarCondition, gen.dayOrNight === 'D');
+                if (metar) {
+                    conditionText = metar.phrase;
+                    iconClass = metar.iconClass;
+                    isSnowing = metar.isSnowing;
+                    isZivatar = metar.isZivatar;
+                }
             } else {
+                // TWC (Weather.com) másodlagos forrás
                 conditionText = gen.wxPhraseLong || mapIconCodeToHungarianText(gen.iconCode, gen.dayOrNight);
                 iconClass = mapTwcIconToFontAwesome(gen.iconCode, gen.dayOrNight);
                 isSnowing = SNOW_ICON_CODES.includes(gen.iconCode);
@@ -1435,7 +1509,29 @@
                 isZivatar = baseLower.includes('zivatar') ||[3, 4, 37, 38, 47].includes(gen.iconCode);
             }
 
+            // 2. MEGOLDÁS (SMART PWS OVERRIDE): Ha az API azt hazudja, hogy esik, de a saját mérőd száraz
+            const isApiRaining = /eső|zápor|szitálás|zivatar|havaz|permet/i.test(conditionText);
+            if (isApiRaining && (!obs.precipRate || obs.precipRate === 0)) {
+                conditionText = "Felhős"; 
+                iconClass = gen.dayOrNight === 'D' ? "fas fa-cloud-sun" : "fas fa-cloud-moon";
+                if (cachedData.metarCondition && cachedData.metarCondition.clouds) {
+                    const covers = cachedData.metarCondition.clouds.map(c => c.cover);
+                    if (covers.includes('OVC')) { conditionText = "Borult"; iconClass = "fas fa-cloud"; }
+                    else if (covers.includes('BKN')) { conditionText = "Erősen felhős"; iconClass = "fas fa-cloud"; }
+                    else if (covers.includes('SCT')) { conditionText = "Részben felhős"; iconClass = gen.dayOrNight === 'D' ? "fas fa-cloud-sun" : "fas fa-cloud-moon"; }
+                    else if (covers.includes('FEW')) { conditionText = "Gyengén felhős"; iconClass = gen.dayOrNight === 'D' ? "fas fa-cloud-sun" : "fas fa-cloud-moon"; }
+                    else { conditionText = gen.dayOrNight === 'D' ? "Derült" : "Tiszta ég"; iconClass = gen.dayOrNight === 'D' ? "fas fa-sun" : "fas fa-moon"; }
+                } else if (conditionText.toLowerCase().includes('zivatar')) {
+                    conditionText = "Erősen felhős";
+                    iconClass = "fas fa-cloud";
+                }
+                isSnowing = false;
+                isZivatar = false;
+            }
+
+            // 3. Ha viszont a VALÓSÁGBAN (PWS) esik, az mindent felülír!
             if (obs.precipRate > 0) {
+                isSnowing = obs.temp !== null && obs.temp < 2; // Saját hőmérséklet alapú hó-detektálás
                 if (isSnowing) {
                     if (obs.precipRate <= 0.5) { conditionText = "Hószállingózás"; iconClass = "fas fa-snowflake"; }
                     else if (obs.precipRate <= 1.5) { conditionText = "Gyenge havazás"; iconClass = "fas fa-snowflake"; }
@@ -1512,15 +1608,23 @@
                         isSnow = s.data.metric.temp < 2;
                     }
 
-                    const footer = raining 
-                        ? `<span style="color: var(--precip-color); font-weight: 800;">Most: ${s.data.metric.precipRate} mm/h<br>${getPrecipIntensityDescription(s.data.metric.precipRate, isSnow)}</span>` 
-                        : (s.lastRainTimestamp ? `Utoljára: ${formatTime(s.lastRainTimestamp)}` : '');
+                    // A kérésnek megfelelően mm/h nélkül, radar leállás időponttal
+                    let footerText = '';
+                    if (raining) {
+                        footerText = `<span style="color: var(--precip-color); font-weight: 800;">Most: ${getPrecipIntensityDescription(s.data.metric.precipRate, isSnow)}</span>`;
+                    } else {
+                        if (s.lastRainTimestamp) {
+                            footerText = `<span style="color: #4ade80; font-weight: 700;">Elállt: ${formatTime(s.lastRainTimestamp)}</span>`;
+                        } else {
+                            footerText = `<span style="color: #4ade80; font-weight: 700; opacity: 0.8;">Csapadék elállt</span>`;
+                        }
+                    }
                     
                     html += `
                         <div class="${cClass}">
                             <div class="precip-badge-title">${s.displayNameShort || s.displayName}</div>
                             <div class="precip-badge-value">${formatValue(s.data.metric.precipTotal, '', 1)}<span> mm</span></div>
-                            <div class="precip-badge-footer">${footer}</div>
+                            <div class="precip-badge-footer">${footerText}</div>
                         </div>
                     `;
                 });
@@ -1538,14 +1642,35 @@
         function render8HourPrecipChance() {
             const full = forecastCache[activeDisplayStationKey]?.hourly ||[];
             const container = document.getElementById('precip-chance-grid');
+            const summaryEl = document.getElementById('precip-chance-summary-text');
             if(!container) return;
 
             updateTextValue('precip-chance-update-time', `Frissítve: ${formatTime(new Date())}`);
 
             const now = new Date();
             const currentHourStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0).getTime();
+            const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).getTime();
+
             let startIdx = full.findIndex(h => new Date(h.time).getTime() >= currentHourStart);
             if (startIdx === -1) startIdx = 0;
+
+            // NAPI VÁRHATÓ ÖSSZCSAPADÉK A MAI NAPRA ÁTHELYEZVE IDE
+            let totalQpfToday = 0;
+            full.forEach(h => {
+                const hTime = new Date(h.time).getTime();
+                if (hTime >= currentHourStart && hTime <= endOfToday) {
+                    totalQpfToday += (h.qpf || 0) + (h.qpfSnow || 0);
+                }
+            });
+
+            if (summaryEl) {
+                if (totalQpfToday > 0) {
+                    summaryEl.innerHTML = `<i class="fas fa-droplet"></i> Mai napra előrejelzett: ${totalQpfToday.toFixed(1)} mm`;
+                    summaryEl.style.display = 'block';
+                } else {
+                    summaryEl.style.display = 'none';
+                }
+            }
 
             const next8Hours = full.slice(startIdx, startIdx + 8);
 
@@ -1619,19 +1744,9 @@
 
             const now = new Date();
             const currentHourStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0).getTime();
-            const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).getTime();
 
             let startIdx = full.findIndex(h => new Date(h.time).getTime() >= currentHourStart);
             if (startIdx === -1) startIdx = 0;
-
-            // ÖSSZES NAPI VÁRHATÓ CSAPADÉK KISZÁMÍTÁSA
-            let totalQpfToday = 0;
-            full.forEach(h => {
-                const hTime = new Date(h.time).getTime();
-                if (hTime >= currentHourStart && hTime <= endOfToday) {
-                    totalQpfToday += (h.qpf || 0) + (h.qpfSnow || 0);
-                }
-            });
 
             let snowLikely = false;
             full.slice(startIdx, startIdx + 8).forEach(h => { if (SNOW_ICON_CODES.includes(h.iconCode) && h.precipChance >= 30) snowLikely = true; });
@@ -1644,11 +1759,6 @@
                 summaryHtml = `<span style="color: var(--precip-color);">🌧️ Csapadék lehet kb. ${formatTime(firstP.time)} körül.</span>`;
             } else { 
                 summaryHtml = `<span style="color: var(--text-primary);">A következő 8 órában száraz idő várható.</span>`;
-            }
-
-            // ÚJ FUNKCIÓ: Ha ma várunk még csapadékot, kiírjuk mennyi az annyi
-            if (totalQpfToday > 0) {
-                summaryHtml += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.15); font-size: 11px; font-weight: 800; letter-spacing: 0.5px; color: var(--precip-color);"><i class="fas fa-droplet"></i> Mai napra előrejelzett: ${totalQpfToday.toFixed(1)} mm</div>`;
             }
 
             summaryEl.innerHTML = summaryHtml;
@@ -1693,7 +1803,6 @@
             container.innerHTML = html;
         }
 
-        // --- TÖRTÉNETI GRAFIKON RENDERELŐ ---
         function renderHistoryChart(dataPoints, stationKey) {
             const ctx = document.getElementById('historyChart');
             if (!ctx) return;
@@ -1822,9 +1931,10 @@
 
             const coords = STATIONS[activeDisplayStationKey].coords;
             
+            // Open-Meteo helyett bejött a hivatalos METAR lekérés!
             await Promise.allSettled([
                 fetchGeneralConditionsData(coords.lat, coords.lon).then(d => { if(d) cachedData.generalConditions = d; }),
-                fetchOpenMeteoCondition(coords.lat, coords.lon),
+                fetchMetarData(),
                 fetchAdvancedSunCalcData(coords.lat, coords.lon).then(d => { cachedData.sunCalc = d; }),
                 fetchAndDisplayForecastsForStation(activeDisplayStationKey)
             ]);
@@ -1846,7 +1956,6 @@
                     const allKeys = Object.keys(STATIONS);
                     await Promise.allSettled(allKeys.map(k => fetchPwsStationData(k)));
 
-                    // 1. Ha a kiválasztott állomás offline lett, váltsunk másikra automatikusan
                     if (!STATIONS[activeDisplayStationKey].isOnline) {
                         const fallbackStation = allKeys.find(k => STATIONS[k].isOnline);
                         if (fallbackStation) {
@@ -1861,8 +1970,7 @@
                         }
                     }
 
-                    // 2. FRISSÍTÉS BESZÚRÁSA: A valós idejű adatok befecskendezése a belső adatbázisba, hogy azonnal megjelenjenek
-                    if (!windowGlobalHistoryCache) windowGlobalHistoryCache = [];
+                    if (!windowGlobalHistoryCache) windowGlobalHistoryCache =[];
                     allKeys.forEach(k => {
                         const st = STATIONS[k];
                         if (st && st.isOnline && st.data) {
@@ -1876,7 +1984,6 @@
                             pts.sort((a,b) => a.timestamp - b.timestamp);
                             const lastPtTs = pts.length > 0 ? pts[pts.length - 1].timestamp : 0;
                             
-                            // Csak akkor fűzzük be, ha tényleg frissebb (min 2 perc)
                             if (liveTs > lastPtTs + 120000) {
                                 windowGlobalHistoryCache.push({
                                     timestamp: liveTs,
@@ -1893,10 +2000,8 @@
                         }
                     });
 
-                    // 3. Fő panelek frissítése
                     updateMainDisplayData(); 
 
-                    // 4. KIKÉNYSZERÍTETT RENDERELÉS: Garantáltan frissül a grafikon és a táblázat a befecskendezett adatokkal!
                     if (windowGlobalHistoryCache.length > 0) {
                         processMainStationHistory();
                         processChartStationHistory();
@@ -1916,6 +2021,7 @@
                 }
             }, 60 * 1000); 
 
+            // API Frissítés 2 percenként a General Data-ra és a METAR-ra
             setInterval(async () => {
                 if (isGenUpdating) return;
                 isGenUpdating = true;
@@ -1923,7 +2029,7 @@
                     const coords = STATIONS[activeDisplayStationKey].coords;
                     await Promise.allSettled([
                         fetchGeneralConditionsData(coords.lat, coords.lon).then(d => { if(d) cachedData.generalConditions = d; }),
-                        fetchOpenMeteoCondition(coords.lat, coords.lon)
+                        fetchMetarData()
                     ]);
                     updateMainDisplayData();
                 } finally {
