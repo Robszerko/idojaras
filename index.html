@@ -295,16 +295,17 @@
         
         const NYIREGYHAZA_COORDS = { lat: 47.9550, lon: 21.7160 };
         
-        // --- 8 FŐ ÁLLOMÁS + 14 CSAPADÉKRADAR (KÉM) ÁLLOMÁS BŐVÍTÉSSEL ---
+        // --- 8 FŐ ÁLLOMÁS (useLHNY flaggel) + RADAR ÁLLOMÁSOK ---
+        // A Nyíregyházához közeli állomások a helyi (LHNY) repülőteret használják égképre, a vidékiek (Nagyhalász, Szakoly) a lokális TWC-t.
         const STATIONS = { 
-            NYIREGYHAZI_UT: { id: 'INYREG26', name: 'Nyíregyházi út', displayName: 'Nyíregyházi út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
-            KERT_UTCA: { id: 'INYREG37', name: 'Kert utca', displayName: 'Kert u.', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null }, 
-            KOSSUTH: { id: 'INYREG42', name: 'Kossuth út 50', displayName: 'Kossuth út 50', displayNameShort: 'Kossuth út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null }, 
-            SOSTOHEGY: { id: 'INYREG20', name: 'Sóstóhegy (Állatpark)', displayName: 'Sóstóhegy', displayNameShort: 'Sóstóhegy', coords: { lat: 48.00, lon: 21.72 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
-            BORBANYA: { id: 'INYREG30', name: 'Borbánya', displayName: 'Borbánya', displayNameShort: 'Borbánya', coords: { lat: 47.92, lon: 21.74 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
-            OROS_DERUS: { id: 'INYREG35', name: 'Oros Derűs utca', displayName: 'Oros', displayNameShort: 'Oros', coords: { lat: 47.93, lon: 21.79 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
-            NAGYHALASZ: { id: 'INAGYH4', name: 'Nagyhalász', displayName: 'Nagyhalász', displayNameShort: 'Nagyhalász', coords: { lat: 48.118, lon: 21.759 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null }, 
-            SZAKOLY: { id: 'ISZAKO1', name: 'Szakoly', displayName: 'Szakoly', displayNameShort: 'Szakoly', coords: { lat: 47.818, lon: 21.984 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null },
+            NYIREGYHAZI_UT: { id: 'INYREG26', name: 'Nyíregyházi út', displayName: 'Nyíregyházi út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
+            KERT_UTCA: { id: 'INYREG37', name: 'Kert utca', displayName: 'Kert u.', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
+            KOSSUTH: { id: 'INYREG42', name: 'Kossuth út 50', displayName: 'Kossuth út 50', displayNameShort: 'Kossuth út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
+            SOSTOHEGY: { id: 'INYREG20', name: 'Sóstóhegy (Állatpark)', displayName: 'Sóstóhegy', displayNameShort: 'Sóstóhegy', coords: { lat: 48.00, lon: 21.72 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
+            BORBANYA: { id: 'INYREG30', name: 'Borbánya', displayName: 'Borbánya', displayNameShort: 'Borbánya', coords: { lat: 47.92, lon: 21.74 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
+            OROS_DERUS: { id: 'INYREG35', name: 'Oros Derűs utca', displayName: 'Oros', displayNameShort: 'Oros', coords: { lat: 47.93, lon: 21.79 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
+            NAGYHALASZ: { id: 'INAGYH4', name: 'Nagyhalász', displayName: 'Nagyhalász', displayNameShort: 'Nagyhalász', coords: { lat: 48.118, lon: 21.759 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: false }, 
+            SZAKOLY: { id: 'ISZAKO1', name: 'Szakoly', displayName: 'Szakoly', displayNameShort: 'Szakoly', coords: { lat: 47.818, lon: 21.984 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: false },
             
             // RADAR ÁLLOMÁSOK
             NAGYCSERKESZ: { id: 'INAGYC6', name: 'Nagycserkesz', displayName: 'Nagycserkesz', coords: { lat: 47.88, lon: 21.59 }, provides:['precip'], isOnline: false, data: null, lastRainTimestamp: null },
@@ -700,14 +701,12 @@
             searchHistory();
         }
 
-        // --- OKOS, FOLYAMATOS ÉLŐ CSAPADÉKNAPLÓ GÖRGETHETŐ BELSŐ RÉSZEKKEL ---
         function renderLiveRainLog(allStationPoints) {
             const logBox = document.getElementById('live-rain-log-content');
             const totalBox = document.getElementById('live-rain-log-total');
             const rainCol = document.getElementById('hero-rain-col');
             if (!logBox || !totalBox || !rainCol) return;
 
-            // Növeljük a fő konténer magasságát is egy kicsit, hogy kényelmesebb legyen a görgetés
             logBox.style.maxHeight = '300px';
 
             let events =[];
@@ -757,7 +756,6 @@
                     let desc = rate > 0 ? getPrecipIntensityDescription(rate, currentEvent.isSnow).toLowerCase() : (currentEvent.isSnow ? 'hószállingózás' : 'csepergés');
                     let accRain = continuousTotal - currentEvent.startTotal;
                     
-                    // Mostantól BÁRMI történik az esemény alatt, azt külön sorként naplózzuk
                     currentEvent.changes.push({ time: p.timestamp, desc: desc, val: accRain });
                     currentEvent.lastDesc = desc;
                     currentEvent.lastTime = p.timestamp;
@@ -845,10 +843,8 @@
             logBox.innerHTML = html;
             totalBox.textContent = (displayDailyTotal || 0).toFixed(1) + ' mm';
             
-            // Ha a felhasználó nincs benne a scrollolásban, görgessünk az aljára
             logBox.scrollTop = logBox.scrollHeight;
             
-            // Az éppen aktív (utolsó) belső scrollbart is görgessük le az esemény aljára
             const innerScrolls = logBox.querySelectorAll('.scrollable-details');
             if (innerScrolls.length > 0) {
                 const lastInner = innerScrolls[innerScrolls.length - 1];
@@ -946,7 +942,7 @@
                     allStationPoints.sort((a,b) => a.timestamp - b.timestamp);
                 }
                 
-                let descendingPoints = [...allStationPoints].sort((a,b) => b.timestamp - a.timestamp);
+                let descendingPoints =[...allStationPoints].sort((a,b) => b.timestamp - a.timestamp);
                 const lastPt = descendingPoints[0];
 
                 const warningBox = document.getElementById('table-offline-warning');
@@ -1463,12 +1459,12 @@
         function renderWeatherData() {
             const obs = cachedData.displayPws; 
             const gen = cachedData.generalConditions; 
-            if (!gen || !obs) return;
+            const station = STATIONS[activeDisplayStationKey];
+            if (!gen || !obs || !station) return;
             
             const timeNow = formatTime(new Date(), { includeSeconds: true });
             const timeNowShort = formatTime(new Date());
 
-            const station = STATIONS[activeDisplayStationKey];
             const statusText = station.isOnline ? '' : ' (Offline)';
             const stName = (station.displayNameShort || station.displayName) + statusText;
 
@@ -1481,7 +1477,6 @@
             
             const temp = obs.temp; 
             const windSpeed = obs.windSpeed ?? gen.windSpeed; 
-            
             const feelsLike = gen.temperatureFeelsLike !== undefined && gen.temperatureFeelsLike !== null ? gen.temperatureFeelsLike : temp;
 
             updateTextValue('current-temp-span', formatValue(temp, '', 1)); 
@@ -1500,7 +1495,19 @@
             let isSnowing = false;
             let isZivatar = false;
 
-            if (cachedData.metarCondition) {
+            let isNyh = station.useLHNY !== false; 
+            let metarAgeMins = 999;
+            
+            if (cachedData.metarCondition && cachedData.metarCondition.obsTime) {
+                let obsMs = new Date(cachedData.metarCondition.obsTime).getTime();
+                if (obsMs < 100000000000) obsMs *= 1000; 
+                metarAgeMins = (Date.now() - obsMs) / 60000;
+            }
+
+            let useMetar = isNyh && cachedData.metarCondition && metarAgeMins <= 20;
+
+            // 1. ALAP: Ha NYH állomás és friss a METAR, használjuk azt, különben TWC (Weather.com)
+            if (useMetar) {
                 const metar = parseMetarToHungarian(cachedData.metarCondition, gen.dayOrNight === 'D');
                 if (metar) {
                     conditionText = metar.phrase;
@@ -1516,11 +1523,14 @@
                 isZivatar = baseLower.includes('zivatar') ||[3, 4, 37, 38, 47].includes(gen.iconCode);
             }
 
-            const isApiRaining = /eső|zápor|szitálás|zivatar|havaz|permet/i.test(conditionText);
+            // 2. HAZUGSÁGVIZSGÁLÓ (SMART PWS OVERRIDE)
+            const isApiRaining = /eső|zápor|szitálás|zivatar|havaz|permet|felhőszakad|hófúvás|hó|jég|csapadék/i.test(conditionText);
             if (isApiRaining && (!obs.precipRate || obs.precipRate === 0)) {
                 conditionText = "Felhős"; 
                 iconClass = gen.dayOrNight === 'D' ? "fas fa-cloud-sun" : "fas fa-cloud-moon";
-                if (cachedData.metarCondition && cachedData.metarCondition.clouds) {
+                
+                // Ha friss a METAR, kérjünk tőle pontos felhőzetet, különben hagyjuk a TWC alapján
+                if (useMetar && cachedData.metarCondition.clouds) {
                     const covers = cachedData.metarCondition.clouds.map(c => c.cover);
                     if (covers.includes('OVC')) { conditionText = "Borult"; iconClass = "fas fa-cloud"; }
                     else if (covers.includes('BKN')) { conditionText = "Erősen felhős"; iconClass = "fas fa-cloud"; }
@@ -1535,6 +1545,40 @@
                 isZivatar = false;
             }
 
+            // 3. NAPSÚGÁRZÁS ALAPÚ AZONNALI TISZTULÁS (Vihar/Eső utáni gyors reagálás)
+            let isDayTime = true;
+            if (cachedData.sunCalc) {
+                const nowMs = new Date().getTime();
+                isDayTime = (nowMs > cachedData.sunCalc.sunrise.getTime() && nowMs < cachedData.sunCalc.sunset.getTime());
+            } else {
+                isDayTime = gen.dayOrNight === 'D';
+            }
+
+            if (isDayTime && obs.solarRadiation !== undefined) {
+                let solar = obs.solarRadiation;
+                let uv = obs.uv || 0;
+
+                if (conditionText.includes("Borult") || conditionText.includes("Erősen felhős") || conditionText.includes("Zivatar") || conditionText.includes("Köd")) {
+                    if (solar > 600 || uv >= 4) {
+                        conditionText = "Napos";
+                        iconClass = "fas fa-sun";
+                        isSnowing = false; isZivatar = false;
+                    } else if (solar > 250 || uv >= 2) {
+                        conditionText = "Részben felhős";
+                        iconClass = "fas fa-cloud-sun";
+                        isSnowing = false; isZivatar = false;
+                    }
+                }
+                
+                if (conditionText.includes("Részben felhős") || conditionText.includes("Gyengén felhős")) {
+                    if (solar > 750 || uv >= 5) {
+                        conditionText = "Napos";
+                        iconClass = "fas fa-sun";
+                    }
+                }
+            }
+
+            // 4. A VALÓSÁG (Ha tényleg esik a PWS mérő szerint)
             if (obs.precipRate > 0) {
                 isSnowing = obs.temp !== null && obs.temp < 2; 
                 if (isSnowing) {
