@@ -531,6 +531,16 @@
                 
                 processMainStationHistory(windowGlobalHistoryCache);
                 processChartStationHistory(windowGlobalHistoryCache);
+                
+                // ÚJ FUNKCIÓ: A részletes táblázat automatikus frissítése!
+                const datePicker = document.getElementById('history-date-picker');
+                if (datePicker && datePicker.value) {
+                    const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+                    const todayStr = (new Date(Date.now() - tzOffset)).toISOString().split('T')[0];
+                    if (datePicker.value === todayStr) {
+                        searchHistory(); 
+                    }
+                }
             });
         }
 
@@ -901,20 +911,28 @@
             
             const selectedDateObj = new Date(dateVal);
             const selectedDateString = selectedDateObj.toLocaleDateString("hu-HU");
+            const todayString = new Date().toLocaleDateString("hu-HU");
 
             const body = document.getElementById('history-table-body');
             const tableTimeEl = document.getElementById('table-update-time');
             if (tableTimeEl) tableTimeEl.textContent = `Frissítve: ${formatTime(new Date())}`;
 
             try {
-                const snap = await firebase.database().ref('history').once('value'); 
-                const data = snap.val(); 
-                if(!data) {
-                    body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">Nincs elérhető adat az adatbázisban.</td></tr>';
-                    return;
-                }
+                let allPoints =[];
 
-                const allPoints = Object.keys(data).map(k => data[k]);
+                // OKOSÍTÁS: Ha a mai napra keresünk, a valós idejű, már betöltött 6000 elemes cache-ből dolgozunk hálózati forgalom nélkül!
+                if (selectedDateString === todayString && windowGlobalHistoryCache && windowGlobalHistoryCache.length > 0) {
+                    allPoints = windowGlobalHistoryCache;
+                } else {
+                    // Régebbi nap esetén muszáj a teljes adatbázist lekérni
+                    const snap = await firebase.database().ref('history').once('value'); 
+                    const data = snap.val(); 
+                    if(!data) {
+                        body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">Nincs elérhető adat az adatbázisban.</td></tr>';
+                        return;
+                    }
+                    allPoints = Object.keys(data).map(k => data[k]);
+                }
                 
                 // Csak az adott állomás rekordjait gyűjtjük
                 let allStationPoints = allPoints.filter(p => p.stationId === targetId || p.stationId === targetKey || p.stationInternalId === targetId);
@@ -1277,7 +1295,6 @@
                 const datePicker = document.getElementById('history-date-picker');
                 if (datePicker) {
                     datePicker.value = localISOTime.split('T')[0];
-                    // Nincs azonnali meghívás, a data fetch végén úgyis lefut
                 }
             }, 100);
 
