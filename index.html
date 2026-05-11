@@ -522,17 +522,64 @@
         }
 
         // --- BIZTOSÍTOTT GRAFIKON BETÖLTŐ & VALÓS NAPI ADATOK ---
+        
+        // Segédfüggvény, ami összevonja a Firebase cache-t az éppen aktuális PWS méréssel
+        function getEnrichedHistory(targetKey) {
+            if (!windowGlobalHistoryCache) return [];
+            
+            const targetId = STATIONS[targetKey].id;
+            let pts = windowGlobalHistoryCache.filter(p => 
+                p.stationId === targetId || p.stationId === targetKey || p.stationInternalId === targetId
+            );
+            pts.sort((a, b) => a.timestamp - b.timestamp);
+            
+            // Élő adat hozzáadása, ha az állomás él, és a mérés frissebb mint a cache
+            const st = STATIONS[targetKey];
+            if (st && st.isOnline && st.data) {
+                let liveTs = Date.now();
+                if (st.data.obsTimeLocal) {
+                    const parsed = new Date(st.data.obsTimeLocal).getTime();
+                    if (!isNaN(parsed)) liveTs = parsed;
+                }
+                
+                const lastPtTs = pts.length > 0 ? pts[pts.length - 1].timestamp : 0;
+                
+                // Ha legalább 2 perccel frissebb az élő adat
+                if (pts.length === 0 || liveTs > lastPtTs + 120000) {
+                    pts.push({
+                        timestamp: liveTs,
+                        stationId: targetId,
+                        temp: st.data.metric.temp,
+                        humidity: st.data.metric.humidity,
+                        windSpeed: st.data.metric.windSpeed,
+                        pressure: st.data.metric.pressure,
+                        uv: st.data.metric.uv !== undefined ? st.data.metric.uv : (st.data.uv || 0),
+                        precipTotal: st.data.metric.precipTotal,
+                        precipRate: st.data.metric.precipRate
+                    });
+                }
+            }
+            return pts;
+        }
+
         function loadHistoricalDataFromFirebase() {
-            firebase.database().ref('history').limitToLast(6000).on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (!data) return;
+            // Emelt limit, masszív stabilitás
+            firebase.database().ref('history').limitToLast(20000).on('value', (snapshot) => {
+                let allPoints =[];
+                // GARANTÁLT KRONOLÓGIAI BEMENET A FIREBASE-BŐL
+                snapshot.forEach(child => {
+                    allPoints.push(child.val());
+                });
                 
-                windowGlobalHistoryCache = Object.keys(data).map(key => data[key]);
+                allPoints.sort((a, b) => a.timestamp - b.timestamp);
                 
-                processMainStationHistory(windowGlobalHistoryCache);
-                processChartStationHistory(windowGlobalHistoryCache);
+                // Mentsük le a Firebase adatokat
+                windowGlobalHistoryCache = allPoints;
                 
-                // ÚJ FUNKCIÓ: A részletes táblázat automatikus frissítése!
+                // Indítsuk el a renderelést
+                processMainStationHistory();
+                processChartStationHistory();
+                
                 const datePicker = document.getElementById('history-date-picker');
                 if (datePicker && datePicker.value) {
                     const tzOffset = (new Date()).getTimezoneOffset() * 60000;
@@ -544,21 +591,14 @@
             });
         }
 
-        function processMainStationHistory(allPoints) {
-            const currentStationId = STATIONS[activeDisplayStationKey].id;
-            const currentStationKey = activeDisplayStationKey;
+        function processMainStationHistory() {
+            const targetKey = activeDisplayStationKey;
+            let filteredPoints = getEnrichedHistory(targetKey);
 
-            // Csak az adott állomás adatait tartjuk meg
-            let filteredPoints = allPoints.filter(dp => 
-                dp.stationId === currentStationId || dp.stationId === currentStationKey || dp.stationInternalId === currentStationId
-            );
-
-            filteredPoints.sort((a, b) => a.timestamp - b.timestamp);
-            
             // OFFLINE ÁLLOMÁS UTOLSÓ ÉSZLELÉSE - LOGIKA (Hero Panel Banner):
             const bannerEl = document.getElementById('offline-warning-banner');
             const lastSeenEl = document.getElementById('offline-last-seen');
-            if (STATIONS[activeDisplayStationKey] && !STATIONS[activeDisplayStationKey].isOnline && filteredPoints.length > 0) {
+            if (STATIONS[targetKey] && !STATIONS[targetKey].isOnline && filteredPoints.length > 0) {
                 const lastPoint = filteredPoints[filteredPoints.length - 1];
                 if (bannerEl && lastSeenEl) {
                     lastSeenEl.textContent = formatLastSeen(lastPoint.timestamp);
@@ -569,24 +609,18 @@
             }
 
             calculateActualDailyStats(filteredPoints);
-            // Küldjük az *összes* elérhető, sorbarendezett pontot a csapadéknaplónak az okos napváltós logikához
             renderLiveRainLog(filteredPoints);
         }
 
-        function processChartStationHistory(allPoints) {
+        function processChartStationHistory() {
             const chartTimeEl = document.getElementById('chart-update-time');
             if (chartTimeEl) chartTimeEl.textContent = `Frissítve: ${formatTime(new Date())}`;
 
             const picker = document.getElementById('history-station-picker');
             let targetKey = picker ? picker.value : activeDisplayStationKey;
             if(!targetKey || !STATIONS[targetKey]) targetKey = activeDisplayStationKey;
-            const targetId = STATIONS[targetKey].id;
-
-            let filteredPoints = allPoints.filter(dp => 
-                dp.stationId === targetId || dp.stationId === targetKey || dp.stationInternalId === targetId
-            );
-
-            filteredPoints.sort((a, b) => a.timestamp - b.timestamp);
+            
+            let filteredPoints = getEnrichedHistory(targetKey);
             
             const todayStr = new Date().toLocaleDateString("hu-HU");
             let todayPoints = filteredPoints.filter(p => new Date(p.timestamp).toLocaleDateString("hu-HU") === todayStr);
@@ -652,7 +686,7 @@
 
         function handleHistoryStationChange() {
             if(windowGlobalHistoryCache && windowGlobalHistoryCache.length > 0) {
-                processChartStationHistory(windowGlobalHistoryCache);
+                processChartStationHistory();
             }
             searchHistory();
         }
@@ -667,14 +701,13 @@
             let events =[];
             let currentEvent = null;
             let prevTotal = 0;
-            let offset = 0; // Itt gyűjtjük az éjféli nullázásoknál elveszett "virtuális" mennyiséget
+            let offset = 0; 
 
-            // 1. TÖRTÉNELMI ADATOK FELDOLGOZÁSA
+            // TÖRTÉNELMI ÉS ÉLŐ ADATOK EGYÜTTES FELDOLGOZÁSA
             for (let i = 0; i < allStationPoints.length; i++) {
                 let p = allStationPoints[i];
                 let rawTotal = p.precipTotal || 0;
                 
-                // Észleljük a PWS nullázását éjfélkor (vagy állomás újraindulásnál)
                 if (rawTotal < prevTotal - 0.5) {
                     offset += prevTotal;
                 }
@@ -717,72 +750,25 @@
                 }
             }
 
-            // 2. AKTUÁLIS, ÉLŐ ADAT HOZZÁFŰZÉSE
-            const station = STATIONS[activeDisplayStationKey];
-            let liveRawTotal = 0;
-            if (station && station.isOnline && station.data) {
-                let liveMetric = station.data.metric;
-                liveRawTotal = liveMetric.precipTotal || 0;
-                
-                if (liveRawTotal < prevTotal - 0.5) {
-                    offset += prevTotal;
-                }
-                let continuousTotal = liveRawTotal + offset;
-                prevTotal = liveRawTotal;
-
-                let rate = liveMetric.precipRate || 0;
-                let temp = liveMetric.temp !== undefined && liveMetric.temp !== null ? liveMetric.temp : 10;
-                let isSnow = temp < 2;
-                let desc = getPrecipIntensityDescription(rate, isSnow).toLowerCase();
-
-                if (rate > 0) {
-                    if (!currentEvent) {
-                        currentEvent = { start: Date.now(), end: null, startTotal: continuousTotal, changes:[], lastDesc: null, isSnow: isSnow };
-                    }
-                    let accRain = continuousTotal - currentEvent.startTotal;
-                    if (accRain < 0) accRain = 0;
-
-                    if (desc !== currentEvent.lastDesc) {
-                        currentEvent.changes.push({ time: Date.now(), desc: desc, val: accRain });
-                        currentEvent.lastDesc = desc;
-                    } else if (currentEvent.changes.length > 0) {
-                        currentEvent.changes[currentEvent.changes.length - 1].val = accRain;
-                    }
-                } else {
-                    if (currentEvent) {
-                        currentEvent.end = Date.now();
-                        currentEvent.totalRain = continuousTotal - currentEvent.startTotal;
-                        if (currentEvent.totalRain < 0) currentEvent.totalRain = 0;
-                        events.push(currentEvent);
-                        currentEvent = null;
-                    }
-                }
-            }
-
-            // Ha jelenleg is esik (nincs még lezárva az esemény)
             if (currentEvent) {
                 currentEvent.totalRain = prevTotal - currentEvent.startTotal;
                 if (currentEvent.totalRain < 0) currentEvent.totalRain = 0;
                 events.push(currentEvent);
             }
 
-            // Kiszűrjük CSAK azokat az eseményeket, amik a MAI NAPHOZ kapcsolódnak
             let todayStart = new Date();
             todayStart.setHours(0,0,0,0);
             let todayStartMs = todayStart.getTime();
 
             let displayEvents = events.filter(ev => {
-                // Egy esemény akkor "mai", ha ma ért véget, vagy még mindig tart (nincs end, vagy az end a jövőben van)
                 return ev.end >= todayStartMs || ev.end === null;
             });
 
-            // Napi fizikai (nullázódó) állomás érték kijelzése lentre
+            const station = STATIONS[activeDisplayStationKey];
             let displayDailyTotal = station && station.isOnline && station.data ? 
                 station.data.metric.precipTotal : 
                 (allStationPoints.length > 0 ? allStationPoints[allStationPoints.length-1].precipTotal : 0);
 
-            // --- LÁTHATÓSÁG SZABÁLYOZÁSA ---
-            // Csak akkor jelenik meg a nagy csapadéknapló oszlop, ha a mai napon van esemény
             if (displayEvents.length > 0) {
                 rainCol.classList.remove('is-hidden');
             } else {
@@ -790,7 +776,6 @@
                 return; 
             }
 
-            // 3. HTML GENERÁLÁSA 
             let html = '';
             displayEvents.forEach(ev => {
                 let startTimeStr = formatEventTime(ev.start);
@@ -801,7 +786,6 @@
                 
                 ev.changes.forEach(ch => {
                     let chDay = new Date(ch.time).getDate();
-                    // Napváltás detektálása a folyamaton belül
                     if (chDay !== lastDay) {
                         detailsHtml += `<div style="text-align:center; padding: 4px 0; margin: 4px 0; border-top: 1px dashed rgba(255,255,255,0.2); border-bottom: 1px dashed rgba(255,255,255,0.2); font-weight: bold; color: var(--precip-snow-color);">--- Napváltás / Éjfél ---</div>`;
                         lastDay = chDay;
@@ -815,7 +799,6 @@
                 });
 
                 if (ev.end) {
-                    // Lezárt esemény (Kattintható harmonika / Accordion)
                     html += `
                     <div class="rain-event-closed" onclick="this.classList.toggle('expanded')" style="background:rgba(0,0,0,0.25); border-radius:6px; border-left: 2px solid var(--precip-color); margin-bottom: 5px; cursor: pointer; overflow: hidden; transition: all 0.3s ease;">
                         <div style="display:flex; justify-content:space-between; padding:6px 8px; align-items: center; user-select: none;">
@@ -827,7 +810,6 @@
                         </div>
                     </div>`;
                 } else {
-                    // Folyamatban lévő (élő) esemény
                     html += `<div style="display:flex; flex-direction:column; gap:4px; background:rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding:6px 8px; border-radius:6px; margin-bottom: 5px;">`;
                     html += `
                         <div style="display:flex; justify-content:space-between; font-weight: bold; color: #fff; margin-bottom: 4px; font-size:12px;">
@@ -918,26 +900,30 @@
             if (tableTimeEl) tableTimeEl.textContent = `Frissítve: ${formatTime(new Date())}`;
 
             try {
-                let allPoints =[];
+                let allStationPoints =[];
 
-                // OKOSÍTÁS: Ha a mai napra keresünk, a valós idejű, már betöltött 6000 elemes cache-ből dolgozunk hálózati forgalom nélkül!
+                // OKOSÍTÁS: Ha a mai napra keresünk, a valós idejű, élő befecskendezéssel feltuningolt cache-ből dolgozunk!
                 if (selectedDateString === todayString && windowGlobalHistoryCache && windowGlobalHistoryCache.length > 0) {
-                    allPoints = windowGlobalHistoryCache;
+                    allStationPoints = getEnrichedHistory(targetKey);
                 } else {
-                    // Régebbi nap esetén muszáj a teljes adatbázist lekérni
+                    // Régebbi nap esetén letöltjük a kért archívumot a Firebaseről
                     const snap = await firebase.database().ref('history').once('value'); 
                     const data = snap.val(); 
                     if(!data) {
                         body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">Nincs elérhető adat az adatbázisban.</td></tr>';
                         return;
                     }
-                    allPoints = Object.keys(data).map(k => data[k]);
+                    let tempPoints =[];
+                    snap.forEach(child => { tempPoints.push(child.val()); });
+                    
+                    // Szűrünk az állomásra
+                    allStationPoints = tempPoints.filter(p => p.stationId === targetId || p.stationId === targetKey || p.stationInternalId === targetId);
+                    allStationPoints.sort((a,b) => a.timestamp - b.timestamp);
                 }
                 
-                // Csak az adott állomás rekordjait gyűjtjük
-                let allStationPoints = allPoints.filter(p => p.stationId === targetId || p.stationId === targetKey || p.stationInternalId === targetId);
-                allStationPoints.sort((a,b) => b.timestamp - a.timestamp);
-                const lastPt = allStationPoints[0];
+                // Kereséshez és utolsó ponthoz csökkenő sorrend a kiíráshoz
+                let descendingPoints =[...allStationPoints].sort((a,b) => b.timestamp - a.timestamp);
+                const lastPt = descendingPoints[0];
 
                 // --- OFFLINE TÁJÉKOZTATÁS A TÁBLÁZAT FELETT ---
                 const warningBox = document.getElementById('table-offline-warning');
@@ -955,7 +941,7 @@
                 }
 
                 // Szűrés a kiválasztott dátumra
-                const dailyPoints = allStationPoints.filter(p => {
+                const dailyPoints = descendingPoints.filter(p => {
                     const pDateString = new Date(p.timestamp).toLocaleDateString("hu-HU");
                     return (pDateString === selectedDateString) || (p.datum && p.datum.includes(selectedDateString));
                 });
@@ -1358,9 +1344,15 @@
                 await fetchAndDisplayForecastsForStation(key);
                 compileAndRenderDisplayData(); 
                 
-                if(windowGlobalHistoryCache.length > 0) {
-                    processMainStationHistory(windowGlobalHistoryCache);
+                // OKOSÍTÁS: Ha fent váltunk állomást, az alsó táblázat is szinkronban kövesse le!
+                const hp = document.getElementById('history-station-picker');
+                if (hp) {
+                    hp.value = activeDisplayStationKey;
+                    processChartStationHistory();
+                    searchHistory();
                 }
+                processMainStationHistory();
+                
             } else if (!STATIONS[key].isOnline) { 
                 event.target.checked = false; 
                 const prev = document.querySelector(`input[value="${activeDisplayStationKey}"]`); 
@@ -1385,10 +1377,6 @@
             renderPrecipitationSummary(); 
             renderHourlyForecastData(); 
             render8HourPrecipChance();
-            
-            if (windowGlobalHistoryCache && windowGlobalHistoryCache.length > 0) {
-                // Csak akkor renderelünk történelmet, ha megvan a teljes history
-            }
         }
 
         function updateTextValue(id, value) { const el = document.getElementById(id); if(el) el.textContent = value; }
@@ -1631,23 +1619,39 @@
 
             const now = new Date();
             const currentHourStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0).getTime();
+            const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).getTime();
+
             let startIdx = full.findIndex(h => new Date(h.time).getTime() >= currentHourStart);
             if (startIdx === -1) startIdx = 0;
+
+            // ÖSSZES NAPI VÁRHATÓ CSAPADÉK KISZÁMÍTÁSA
+            let totalQpfToday = 0;
+            full.forEach(h => {
+                const hTime = new Date(h.time).getTime();
+                if (hTime >= currentHourStart && hTime <= endOfToday) {
+                    totalQpfToday += (h.qpf || 0) + (h.qpfSnow || 0);
+                }
+            });
 
             let snowLikely = false;
             full.slice(startIdx, startIdx + 8).forEach(h => { if (SNOW_ICON_CODES.includes(h.iconCode) && h.precipChance >= 30) snowLikely = true; });
             const firstP = full.slice(startIdx, startIdx + 8).find(h => h.precipChance >= 30);
             
+            let summaryHtml = "";
             if (snowLikely) {
-                summaryEl.textContent = `❄️ Havazás lehet kb. ${formatTime(firstP.time)} körül.`;
-                summaryEl.style.color = "var(--precip-snow-color)";
+                summaryHtml = `<span style="color: var(--precip-snow-color);">❄️ Havazás lehet kb. ${formatTime(firstP.time)} körül.</span>`;
             } else if (firstP) { 
-                summaryEl.textContent = `🌧️ Csapadék lehet kb. ${formatTime(firstP.time)} körül.`;
-                summaryEl.style.color = "var(--precip-color)";
+                summaryHtml = `<span style="color: var(--precip-color);">🌧️ Csapadék lehet kb. ${formatTime(firstP.time)} körül.</span>`;
             } else { 
-                summaryEl.textContent = "A következő 8 órában száraz idő várható.";
-                summaryEl.style.color = "var(--text-primary)";
+                summaryHtml = `<span style="color: var(--text-primary);">A következő 8 órában száraz idő várható.</span>`;
             }
+
+            // ÚJ FUNKCIÓ: Ha ma várunk még csapadékot, kiírjuk mennyi az annyi
+            if (totalQpfToday > 0) {
+                summaryHtml += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.15); font-size: 11px; font-weight: 800; letter-spacing: 0.5px; color: var(--precip-color);"><i class="fas fa-droplet"></i> Mai napra előrejelzett: ${totalQpfToday.toFixed(1)} mm</div>`;
+            }
+
+            summaryEl.innerHTML = summaryHtml;
 
             let pagHTML = '';
             for(let i = 0; i < 8; i++) { 
@@ -1828,9 +1832,6 @@
             updateMainDisplayData();
             loadHistoricalDataFromFirebase();
             
-            // Azonnali betöltés a táblázathoz a kezdésnél!
-            searchHistory();
-            
             startMasterLoop();
         }
 
@@ -1845,6 +1846,7 @@
                     const allKeys = Object.keys(STATIONS);
                     await Promise.allSettled(allKeys.map(k => fetchPwsStationData(k)));
 
+                    // 1. Ha a kiválasztott állomás offline lett, váltsunk másikra automatikusan
                     if (!STATIONS[activeDisplayStationKey].isOnline) {
                         const fallbackStation = allKeys.find(k => STATIONS[k].isOnline);
                         if (fallbackStation) {
@@ -1852,13 +1854,63 @@
                             const radio = document.getElementById(`station-select-${fallbackStation.toLowerCase()}`);
                             if (radio) radio.checked = true;
                             
-                            if (windowGlobalHistoryCache.length > 0) {
-                                processMainStationHistory(windowGlobalHistoryCache);
-                            }
+                            const hp = document.getElementById('history-station-picker');
+                            if (hp) hp.value = fallbackStation;
+                            
                             fetchAndDisplayForecastsForStation(fallbackStation);
                         }
                     }
+
+                    // 2. FRISSÍTÉS BESZÚRÁSA: A valós idejű adatok befecskendezése a belső adatbázisba, hogy azonnal megjelenjenek
+                    if (!windowGlobalHistoryCache) windowGlobalHistoryCache = [];
+                    allKeys.forEach(k => {
+                        const st = STATIONS[k];
+                        if (st && st.isOnline && st.data) {
+                            let liveTs = Date.now();
+                            if (st.data.obsTimeLocal) {
+                                const parsed = new Date(st.data.obsTimeLocal).getTime();
+                                if (!isNaN(parsed)) liveTs = parsed;
+                            }
+                            
+                            let pts = windowGlobalHistoryCache.filter(p => p.stationId === st.id || p.stationId === k || p.stationInternalId === st.id);
+                            pts.sort((a,b) => a.timestamp - b.timestamp);
+                            const lastPtTs = pts.length > 0 ? pts[pts.length - 1].timestamp : 0;
+                            
+                            // Csak akkor fűzzük be, ha tényleg frissebb (min 2 perc)
+                            if (liveTs > lastPtTs + 120000) {
+                                windowGlobalHistoryCache.push({
+                                    timestamp: liveTs,
+                                    stationId: st.id,
+                                    temp: st.data.metric.temp,
+                                    humidity: st.data.metric.humidity,
+                                    windSpeed: st.data.metric.windSpeed,
+                                    pressure: st.data.metric.pressure,
+                                    uv: st.data.metric.uv !== undefined ? st.data.metric.uv : (st.data.uv || 0),
+                                    precipTotal: st.data.metric.precipTotal,
+                                    precipRate: st.data.metric.precipRate
+                                });
+                            }
+                        }
+                    });
+
+                    // 3. Fő panelek frissítése
                     updateMainDisplayData(); 
+
+                    // 4. KIKÉNYSZERÍTETT RENDERELÉS: Garantáltan frissül a grafikon és a táblázat a befecskendezett adatokkal!
+                    if (windowGlobalHistoryCache.length > 0) {
+                        processMainStationHistory();
+                        processChartStationHistory();
+                        
+                        const datePicker = document.getElementById('history-date-picker');
+                        if (datePicker && datePicker.value) {
+                            const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+                            const todayStr = (new Date(Date.now() - tzOffset)).toISOString().split('T')[0];
+                            if (datePicker.value === todayStr) {
+                                searchHistory(); 
+                            }
+                        }
+                    }
+
                 } finally {
                     isPwsUpdating = false;
                 }
