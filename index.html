@@ -295,14 +295,13 @@
         
         const NYIREGYHAZA_COORDS = { lat: 47.9550, lon: 21.7160 };
         
-        // --- 8 FŐ ÁLLOMÁS (useLHNY flaggel) + RADAR ÁLLOMÁSOK ---
-        // A Nyíregyházához közeli állomások a helyi (LHNY) repülőteret használják égképre, a vidékiek (Nagyhalász, Szakoly) a lokális TWC-t.
+        // --- ÁLLOMÁSOK DEFINÍCIÓJA (BELVÁROS = VIRTUÁLIS ÁTLAG) ---
         const STATIONS = { 
+            BELVAROS: { id: 'VIRT_BELVAROS', name: 'Nyíregyháza belvárosa', displayName: 'Nyíregyháza', displayNameShort: 'Nyíregyháza belvárosa', isVirtual: true, subStations: ['INYREG48', 'INYREG44', 'INYREG56', 'INYREG30', 'INYREG47', 'INYREG55'], coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure', 'solar', 'uv'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true },
             NYIREGYHAZI_UT: { id: 'INYREG26', name: 'Nyíregyházi út', displayName: 'Nyíregyházi út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             KERT_UTCA: { id: 'INYREG37', name: 'Kert utca', displayName: 'Kert u.', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             KOSSUTH: { id: 'INYREG42', name: 'Kossuth út 50', displayName: 'Kossuth út 50', displayNameShort: 'Kossuth út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             SOSTOHEGY: { id: 'INYREG20', name: 'Sóstóhegy (Állatpark)', displayName: 'Sóstóhegy', displayNameShort: 'Sóstóhegy', coords: { lat: 48.00, lon: 21.72 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
-            BORBANYA: { id: 'INYREG30', name: 'Borbánya', displayName: 'Borbánya', displayNameShort: 'Borbánya', coords: { lat: 47.92, lon: 21.74 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             OROS_DERUS: { id: 'INYREG35', name: 'Oros Derűs utca', displayName: 'Oros', displayNameShort: 'Oros', coords: { lat: 47.93, lon: 21.79 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             NAGYHALASZ: { id: 'INAGYH4', name: 'Nagyhalász', displayName: 'Nagyhalász', displayNameShort: 'Nagyhalász', coords: { lat: 48.118, lon: 21.759 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: false }, 
             SZAKOLY: { id: 'ISZAKO1', name: 'Szakoly', displayName: 'Szakoly', displayNameShort: 'Szakoly', coords: { lat: 47.818, lon: 21.984 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: false },
@@ -325,7 +324,7 @@
             CSENGER: { id: 'ICSENG10', name: 'Csenger', displayName: 'Csenger', displayNameShort: 'Csenger', coords: { lat: 47.83, lon: 22.68 }, provides:['precip'], isOnline: false, data: null, lastRainTimestamp: null }
         };
 
-        let activeDisplayStationKey = 'KERT_UTCA'; 
+        let activeDisplayStationKey = 'BELVAROS'; 
         let cachedData = { displayPws: null, generalConditions: {}, sunCalc: null, sunTimes: null, metarCondition: null };
         let forecastCache = {};
         let isWeatherDisplayInitialized = false; 
@@ -333,7 +332,7 @@
         let historyChartInstance = null;
         let windowGlobalHistoryCache =[]; 
 
-        const displayableStations =['NYIREGYHAZI_UT', 'KERT_UTCA', 'KOSSUTH', 'SOSTOHEGY', 'BORBANYA', 'OROS_DERUS', 'NAGYHALASZ', 'SZAKOLY'];
+        const displayableStations =['BELVAROS', 'NYIREGYHAZI_UT', 'KERT_UTCA', 'KOSSUTH', 'SOSTOHEGY', 'OROS_DERUS', 'NAGYHALASZ', 'SZAKOLY'];
 
         const NO_DATA_STRING = 'N/A'; 
         const SNOW_ICON_CODES =[5, 6, 7, 8, 10, 13, 14, 15, 16, 41, 42, 43, 46];
@@ -498,21 +497,99 @@
         
         async function fetchPwsStationData(stationKey) { 
             const stationConfig = STATIONS[stationKey]; 
-            const url = `https://api.weather.com/v2/pws/observations/current?apiKey=${weatherComApiKey}&stationId=${stationConfig.id}&numericPrecision=decimal&format=json&units=m`; 
-            try { 
-                const response = await fetchWithTimeout(url); 
-                if (!response.ok) throw new Error(); 
-                const data = await response.json(); 
-                if (!data.observations || data.observations.length === 0) throw new Error(); 
-                const obs = data.observations[0]; 
-                stationConfig.isOnline = true; 
-                stationConfig.data = obs; 
-                if (obs.metric.precipRate > 0) stationConfig.lastRainTimestamp = new Date(obs.obsTimeLocal).getTime(); 
-            } catch (error) { 
-                stationConfig.isOnline = false; 
-            } finally { 
-                if(isWeatherDisplayInitialized) updateStationStatusUI(stationKey); 
-            } 
+            
+            if (stationConfig.isVirtual) {
+                try {
+                    const promises = stationConfig.subStations.map(subId => {
+                        const url = `https://api.weather.com/v2/pws/observations/current?apiKey=${weatherComApiKey}&stationId=${subId}&numericPrecision=decimal&format=json&units=m`;
+                        return fetchWithTimeout(url).then(r => r.json()).catch(() => null);
+                    });
+                    
+                    const results = await Promise.all(promises);
+                    let validObs =[];
+                    let latestTime = 0;
+                    
+                    results.forEach(res => {
+                        if (res && res.observations && res.observations.length > 0 && res.observations[0].metric && res.observations[0].metric.temp != null) {
+                            validObs.push(res.observations[0]);
+                            const t = new Date(res.observations[0].obsTimeLocal).getTime();
+                            if(t > latestTime) latestTime = t;
+                        }
+                    });
+
+                    if (validObs.length > 0) {
+                        let sumTemp = 0, sumHum = 0, sumWind = 0, sumPressure = 0, sumUv = 0, sumPrecipTotal = 0, sumPrecipRate = 0, sumSolar = 0, sumWindGust = 0;
+                        let countPrecip = 0, countUv = 0, countSolar = 0, countWindDir = 0, countWindGust = 0;
+                        let sumU = 0, sumV = 0;
+
+                        validObs.forEach(obs => {
+                            const m = obs.metric;
+                            sumTemp += m.temp;
+                            sumHum += obs.humidity;
+                            sumWind += (m.windSpeed || 0);
+                            sumPressure += (m.pressure || 0);
+                            
+                            if (m.precipTotal !== undefined && m.precipTotal !== null) { sumPrecipTotal += m.precipTotal; countPrecip++; }
+                            if (m.precipRate !== undefined && m.precipRate !== null) { sumPrecipRate += m.precipRate; }
+                            if (obs.uv !== undefined && obs.uv !== null) { sumUv += obs.uv; countUv++; }
+                            if (obs.solarRadiation !== undefined && obs.solarRadiation !== null) { sumSolar += obs.solarRadiation; countSolar++; }
+                            
+                            if (obs.winddir !== undefined && obs.winddir !== null) {
+                                countWindDir++;
+                                const rad = obs.winddir * Math.PI / 180;
+                                sumU += Math.sin(rad);
+                                sumV += Math.cos(rad);
+                            }
+                            if (m.windGust !== undefined && m.windGust !== null) { sumWindGust += m.windGust; countWindGust++; }
+                        });
+
+                        const n = validObs.length;
+                        let avgWindDir = null;
+                        if (countWindDir > 0) {
+                            avgWindDir = (Math.atan2(sumU / countWindDir, sumV / countWindDir) * 180 / Math.PI + 360) % 360;
+                        }
+
+                        const avgObs = {
+                            obsTimeLocal: new Date(latestTime).toISOString(),
+                            humidity: Math.round(sumHum / n),
+                            uv: countUv > 0 ? (sumUv / countUv) : null,
+                            solarRadiation: countSolar > 0 ? (sumSolar / countSolar) : null,
+                            winddir: avgWindDir !== null ? Math.round(avgWindDir) : null,
+                            metric: {
+                                temp: sumTemp / n,
+                                windSpeed: sumWind / n,
+                                pressure: sumPressure / n,
+                                precipTotal: countPrecip > 0 ? (sumPrecipTotal / countPrecip) : 0,
+                                precipRate: countPrecip > 0 ? (sumPrecipRate / countPrecip) : 0,
+                                windGust: countWindGust > 0 ? (sumWindGust / countWindGust) : 0
+                            }
+                        };
+
+                        stationConfig.isOnline = true;
+                        stationConfig.data = avgObs;
+                        if (avgObs.metric.precipRate > 0) stationConfig.lastRainTimestamp = latestTime;
+                    } else {
+                        stationConfig.isOnline = false;
+                    }
+                } catch (error) {
+                    stationConfig.isOnline = false;
+                }
+            } else {
+                const url = `https://api.weather.com/v2/pws/observations/current?apiKey=${weatherComApiKey}&stationId=${stationConfig.id}&numericPrecision=decimal&format=json&units=m`; 
+                try { 
+                    const response = await fetchWithTimeout(url); 
+                    if (!response.ok) throw new Error(); 
+                    const data = await response.json(); 
+                    if (!data.observations || data.observations.length === 0) throw new Error(); 
+                    const obs = data.observations[0]; 
+                    stationConfig.isOnline = true; 
+                    stationConfig.data = obs; 
+                    if (obs.metric.precipRate > 0) stationConfig.lastRainTimestamp = new Date(obs.obsTimeLocal).getTime(); 
+                } catch (error) { 
+                    stationConfig.isOnline = false; 
+                }
+            }
+            if(isWeatherDisplayInitialized) updateStationStatusUI(stationKey); 
         }
         
         async function fetchGeneralConditionsData(lat, lon) { 
@@ -567,10 +644,10 @@
                         timestamp: liveTs,
                         stationId: targetId,
                         temp: st.data.metric.temp,
-                        humidity: st.data.metric.humidity,
+                        humidity: st.data.humidity,
                         windSpeed: st.data.metric.windSpeed,
                         pressure: st.data.metric.pressure,
-                        uv: st.data.metric.uv !== undefined ? st.data.metric.uv : (st.data.uv || 0),
+                        uv: st.data.uv !== undefined ? st.data.uv : 0,
                         precipTotal: st.data.metric.precipTotal !== undefined ? st.data.metric.precipTotal : 0,
                         precipRate: st.data.metric.precipRate !== undefined ? st.data.metric.precipRate : 0
                     });
@@ -1034,9 +1111,9 @@
                             <td style="padding: 10px 4px; white-space: nowrap;">${timeStr}</td>
                             <td style="padding: 10px 4px; font-weight:bold; color: #ffdd00; white-space: nowrap;">${p.temp != null ? p.temp.toFixed(1) + ' °C' : '--'}</td>
                             <td style="padding: 10px 4px; white-space: nowrap;">${p.humidity != null ? p.humidity + ' %' : '--'}</td>
-                            <td style="padding: 10px 4px; color: #38bdf8; white-space: nowrap;">${p.windSpeed || 0} km/h</td>
-                            <td style="padding: 10px 4px; white-space: nowrap;">${p.pressure != null ? p.pressure + ' hPa' : '--'}</td>
-                            <td style="padding: 10px 4px; white-space: nowrap;">${p.uv != null ? p.uv : '--'}</td>
+                            <td style="padding: 10px 4px; color: #38bdf8; white-space: nowrap;">${p.windSpeed != null ? Number(p.windSpeed).toFixed(1) : '0.0'} km/h</td>
+                            <td style="padding: 10px 4px; white-space: nowrap;">${p.pressure != null ? Number(p.pressure).toFixed(1) + ' hPa' : '--'}</td>
+                            <td style="padding: 10px 4px; white-space: nowrap;">${p.uv != null ? Number(p.uv).toFixed(1) : '--'}</td>
                             <td style="padding: 10px 4px;">${precipHtml}</td>
                         </tr>`;
 
@@ -1072,9 +1149,9 @@
                             <td style="padding: 10px 4px; white-space: nowrap;">${timeStr}</td>
                             <td style="padding: 10px 4px; font-weight:bold; color: #ffdd00; white-space: nowrap;">${lastPt.temp != null ? lastPt.temp.toFixed(1) + ' °C' : '--'}</td>
                             <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.humidity != null ? lastPt.humidity + ' %' : '--'}</td>
-                            <td style="padding: 10px 4px; color: #38bdf8; white-space: nowrap;">${lastPt.windSpeed || 0} km/h</td>
-                            <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.pressure != null ? lastPt.pressure + ' hPa' : '--'}</td>
-                            <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.uv != null ? lastPt.uv : '--'}</td>
+                            <td style="padding: 10px 4px; color: #38bdf8; white-space: nowrap;">${lastPt.windSpeed != null ? Number(lastPt.windSpeed).toFixed(1) : '0.0'} km/h</td>
+                            <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.pressure != null ? Number(lastPt.pressure).toFixed(1) + ' hPa' : '--'}</td>
+                            <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.uv != null ? Number(lastPt.uv).toFixed(1) : '--'}</td>
                             <td style="padding: 10px 4px;">${precipHtml}</td>
                         </tr>`;
                     } else {
@@ -1161,7 +1238,7 @@
                     <div class="station-tabs">
                         ${displayableStations.map(k => `
                             <div class="station-selector" id="${k.toLowerCase()}-selector-container">
-                                <input type="radio" name="station-select" id="station-select-${k.toLowerCase()}" value="${k}">
+                                <input type="radio" name="station-select" id="station-select-${k.toLowerCase()}" value="${k}" ${k === activeDisplayStationKey ? 'checked' : ''}>
                                 <label for="station-select-${k.toLowerCase()}">
                                     <div class="status-dot" id="status-indicator-${k}"></div>
                                     ${STATIONS[k].displayNameShort || STATIONS[k].displayName}
@@ -1315,7 +1392,7 @@
                         </div>
                         <div class="date-filter-container" style="display: flex; gap: 6px; align-items: center;">
                             <select id="history-station-picker" class="date-input" style="width: auto; max-width: 130px;" onchange="handleHistoryStationChange()">
-                                ${displayableStations.map(k => `<option value="${k}">${STATIONS[k].displayNameShort || STATIONS[k].displayName}</option>`).join('')}
+                                ${displayableStations.map(k => `<option value="${k}" ${k === activeDisplayStationKey ? 'selected' : ''}>${STATIONS[k].displayNameShort || STATIONS[k].displayName}</option>`).join('')}
                             </select>
                             <input type="date" id="history-date-picker" class="date-input" onclick="if(this.showPicker) this.showPicker();">
                             <button class="pagination-btn active" style="border: none;" onclick="searchHistory()">Lekérés</button>
@@ -1970,11 +2047,12 @@
             await Promise.allSettled(keys.map(k => fetchPwsStationData(k)));
             
             const firstOnline = keys.find(k => STATIONS[k].isOnline);
-            if (firstOnline) {
+            if (firstOnline && !STATIONS[activeDisplayStationKey].isOnline) {
                 activeDisplayStationKey = firstOnline;
-                const hp = document.getElementById('history-station-picker');
-                if (hp) hp.value = firstOnline;
             }
+            
+            const hp = document.getElementById('history-station-picker');
+            if (hp) hp.value = activeDisplayStationKey;
 
             const coords = STATIONS[activeDisplayStationKey].coords;
             
@@ -2035,10 +2113,10 @@
                                     timestamp: liveTs,
                                     stationId: st.id,
                                     temp: st.data.metric.temp,
-                                    humidity: st.data.metric.humidity,
+                                    humidity: st.data.humidity,
                                     windSpeed: st.data.metric.windSpeed,
                                     pressure: st.data.metric.pressure,
-                                    uv: st.data.metric.uv !== undefined ? st.data.metric.uv : (st.data.uv || 0),
+                                    uv: st.data.uv !== undefined ? st.data.uv : 0,
                                     precipTotal: st.data.metric.precipTotal !== undefined ? st.data.metric.precipTotal : 0,
                                     precipRate: st.data.metric.precipRate !== undefined ? st.data.metric.precipRate : 0
                                 });
