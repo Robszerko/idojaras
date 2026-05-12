@@ -688,14 +688,19 @@
             return pts;
         }
 
-        let firebaseDebounceTimer = null;
-
         function loadHistoricalDataFromFirebase() {
-            firebase.database().ref('history').limitToLast(20000).on('value', (snapshot) => {
-                // Fagyás elleni Debounce: megvárja amíg a GAS script befejezi a batch feltöltést
-                if (firebaseDebounceTimer) clearTimeout(firebaseDebounceTimer);
-                
-                firebaseDebounceTimer = setTimeout(() => {
+            const now = new Date();
+            // Csak a mai nap adatait kérjük (éjféltől), plusz előtte 4 órát a csapadék számításhoz
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).getTime();
+            const fetchStartMs = startOfToday - (4 * 60 * 60 * 1000); 
+
+            // .on() HELYETT .once()-T HASZNÁLUNK (csak egyszer tölt le, nem figyel folyamatosan!)
+            // .limitToLast() HELYETT időalapú szűrést használunk!
+            firebase.database().ref('history')
+                .orderByChild('timestamp')
+                .startAt(fetchStartMs)
+                .once('value')
+                .then((snapshot) => {
                     let allPoints =[];
                     snapshot.forEach(child => {
                         allPoints.push(child.val());
@@ -715,8 +720,8 @@
                             searchHistory(); 
                         }
                     }
-                }, 1500); // 1.5 mp várakozás
-            });
+                })
+                .catch(error => console.error("Firebase betöltési hiba:", error));
         }
 
         function processMainStationHistory() {
