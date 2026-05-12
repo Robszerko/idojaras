@@ -564,28 +564,21 @@
                             avgWindDir = (Math.atan2(sumU / countWindDir, sumV / countWindDir) * 180 / Math.PI + 360) % 360;
                         }
 
-                        // 2. Csapadék Okos Hibrid Logika
+                        // 2. Csapadék Okos Hibrid Logika - Javított verzió
                         const precipTotals = validObs.map(o => o.metric.precipTotal || 0);
                         const precipRates = validObs.map(o => o.metric.precipRate || 0);
-                        const rainRateCount = precipRates.filter(r => r > 0).length;
-                        const rainTotalCount = precipTotals.filter(t => t > 0).length;
-
+                        
+                        const wetRates = precipRates.filter(r => r > 0);
                         let finalPrecipRate = 0;
-                        let finalPrecipTotal = 0;
                         let isLocalShower = false;
 
-                        if (rainRateCount >= 2) {
-                            finalPrecipRate = Math.max(...precipRates);
-                            if (rainRateCount < n) isLocalShower = true;
-                        } else {
-                            finalPrecipRate = precipRates.reduce((a,b) => a+b, 0) / n;
+                        if (wetRates.length > 0) {
+                            finalPrecipRate = wetRates.reduce((a, b) => a + b, 0) / wetRates.length; // Csak ott átlagolunk ahol esik
+                            if (wetRates.length < Math.ceil(n / 2)) isLocalShower = true;
                         }
 
-                        if (rainTotalCount >= 2) {
-                            finalPrecipTotal = Math.max(...precipTotals);
-                        } else {
-                            finalPrecipTotal = precipTotals.reduce((a,b) => a+b, 0) / n;
-                        }
+                        // A napi összegnél a teljes hálózat átlagát kell venni a kiugrások elkerülése végett
+                        const finalPrecipTotal = precipTotals.reduce((a, b) => a + b, 0) / n;
 
                         const avgObs = {
                             obsTimeLocal: new Date(latestTime).toISOString(),
@@ -695,27 +688,34 @@
             return pts;
         }
 
+        let firebaseDebounceTimer = null;
+
         function loadHistoricalDataFromFirebase() {
             firebase.database().ref('history').limitToLast(20000).on('value', (snapshot) => {
-                let allPoints =[];
-                snapshot.forEach(child => {
-                    allPoints.push(child.val());
-                });
-                allPoints.sort((a, b) => a.timestamp - b.timestamp);
+                // Fagyás elleni Debounce: megvárja amíg a GAS script befejezi a batch feltöltést
+                if (firebaseDebounceTimer) clearTimeout(firebaseDebounceTimer);
                 
-                windowGlobalHistoryCache = allPoints;
-                
-                processMainStationHistory();
-                processChartStationHistory();
-                
-                const datePicker = document.getElementById('history-date-picker');
-                if (datePicker && datePicker.value) {
-                    const tzOffset = (new Date()).getTimezoneOffset() * 60000;
-                    const todayStr = (new Date(Date.now() - tzOffset)).toISOString().split('T')[0];
-                    if (datePicker.value === todayStr) {
-                        searchHistory(); 
+                firebaseDebounceTimer = setTimeout(() => {
+                    let allPoints =[];
+                    snapshot.forEach(child => {
+                        allPoints.push(child.val());
+                    });
+                    allPoints.sort((a, b) => a.timestamp - b.timestamp);
+                    
+                    windowGlobalHistoryCache = allPoints;
+                    
+                    processMainStationHistory();
+                    processChartStationHistory();
+                    
+                    const datePicker = document.getElementById('history-date-picker');
+                    if (datePicker && datePicker.value) {
+                        const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+                        const todayStr = (new Date(Date.now() - tzOffset)).toISOString().split('T')[0];
+                        if (datePicker.value === todayStr) {
+                            searchHistory(); 
+                        }
                     }
-                }
+                }, 1500); // 1.5 mp várakozás
             });
         }
 
