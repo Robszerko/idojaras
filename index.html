@@ -1045,7 +1045,17 @@
                 if (selectedDateString === todayString && windowGlobalHistoryCache && windowGlobalHistoryCache.length > 0) {
                     allStationPoints = getEnrichedHistory(targetKey);
                 } else {
-                    const snap = await firebase.database().ref('history').once('value'); 
+                    // Csak az adott nap adatait kérjük le, nem a teljes adatbázist!
+                    let dayStartMs = selectedDateObj.getTime();
+                    let dayEndMs = dayStartMs + 86400000 - 1; // 23:59:59
+                    let fetchStartMs = dayStartMs - (4 * 60 * 60 * 1000); // -4 óra a csapadék bázisértékhez
+
+                    const snap = await firebase.database().ref('history')
+                        .orderByChild('timestamp')
+                        .startAt(fetchStartMs)
+                        .endAt(dayEndMs)
+                        .once('value'); 
+                        
                     const data = snap.val(); 
                     if(!data) {
                         body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">Nincs elérhető adat az adatbázisban.</td></tr>';
