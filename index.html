@@ -474,6 +474,14 @@
             return { phrase, iconClass, isSnowing, isZivatar };
         }
 
+        // Segédfüggvény a medián számításhoz (QC)
+        function getMedian(arr) {
+            if(arr.length === 0) return 0;
+            const sorted = [...arr].sort((a,b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+
         // --- ADATLEKÉRÉSEK (APIs) ---
         async function fetchMetarData() {
             try {
@@ -518,19 +526,27 @@
                     });
 
                     if (validObs.length > 0) {
-                        let sumTemp = 0, sumHum = 0, sumWind = 0, sumPressure = 0, sumUv = 0, sumPrecipTotal = 0, sumPrecipRate = 0, sumSolar = 0, sumWindGust = 0;
-                        let countPrecip = 0, countUv = 0, countSolar = 0, countWindDir = 0, countWindGust = 0;
+                        const n = validObs.length;
+
+                        // 1. Hőmérséklet QC (Kiwitting outliers)
+                        const temps = validObs.map(o => o.metric.temp);
+                        const medTemp = getMedian(temps);
+                        const validTempObs = validObs.filter(o => Math.abs(o.metric.temp - medTemp) <= 3.5);
+                        const tempObsToUse = validTempObs.length > 0 ? validTempObs : validObs;
+                        let sumTemp = 0;
+                        tempObsToUse.forEach(o => sumTemp += o.metric.temp);
+                        const avgTemp = sumTemp / tempObsToUse.length;
+
+                        let sumHum = 0, sumWind = 0, sumPressure = 0, sumUv = 0, sumSolar = 0, sumWindGust = 0;
+                        let countUv = 0, countSolar = 0, countWindDir = 0, countWindGust = 0;
                         let sumU = 0, sumV = 0;
 
                         validObs.forEach(obs => {
                             const m = obs.metric;
-                            sumTemp += m.temp;
                             sumHum += obs.humidity;
                             sumWind += (m.windSpeed || 0);
                             sumPressure += (m.pressure || 0);
                             
-                            if (m.precipTotal !== undefined && m.precipTotal !== null) { sumPrecipTotal += m.precipTotal; countPrecip++; }
-                            if (m.precipRate !== undefined && m.precipRate !== null) { sumPrecipRate += m.precipRate; }
                             if (obs.uv !== undefined && obs.uv !== null) { sumUv += obs.uv; countUv++; }
                             if (obs.solarRadiation !== undefined && obs.solarRadiation !== null) { sumSolar += obs.solarRadiation; countSolar++; }
                             
@@ -543,10 +559,32 @@
                             if (m.windGust !== undefined && m.windGust !== null) { sumWindGust += m.windGust; countWindGust++; }
                         });
 
-                        const n = validObs.length;
                         let avgWindDir = null;
                         if (countWindDir > 0) {
                             avgWindDir = (Math.atan2(sumU / countWindDir, sumV / countWindDir) * 180 / Math.PI + 360) % 360;
+                        }
+
+                        // 2. Csapadék Okos Hibrid Logika
+                        const precipTotals = validObs.map(o => o.metric.precipTotal || 0);
+                        const precipRates = validObs.map(o => o.metric.precipRate || 0);
+                        const rainRateCount = precipRates.filter(r => r > 0).length;
+                        const rainTotalCount = precipTotals.filter(t => t > 0).length;
+
+                        let finalPrecipRate = 0;
+                        let finalPrecipTotal = 0;
+                        let isLocalShower = false;
+
+                        if (rainRateCount >= 2) {
+                            finalPrecipRate = Math.max(...precipRates);
+                            if (rainRateCount < n) isLocalShower = true;
+                        } else {
+                            finalPrecipRate = precipRates.reduce((a,b) => a+b, 0) / n;
+                        }
+
+                        if (rainTotalCount >= 2) {
+                            finalPrecipTotal = Math.max(...precipTotals);
+                        } else {
+                            finalPrecipTotal = precipTotals.reduce((a,b) => a+b, 0) / n;
                         }
 
                         const avgObs = {
@@ -555,12 +593,13 @@
                             uv: countUv > 0 ? (sumUv / countUv) : null,
                             solarRadiation: countSolar > 0 ? (sumSolar / countSolar) : null,
                             winddir: avgWindDir !== null ? Math.round(avgWindDir) : null,
+                            isLocalShower: isLocalShower,
                             metric: {
-                                temp: sumTemp / n,
+                                temp: avgTemp,
                                 windSpeed: sumWind / n,
                                 pressure: sumPressure / n,
-                                precipTotal: countPrecip > 0 ? (sumPrecipTotal / countPrecip) : 0,
-                                precipRate: countPrecip > 0 ? (sumPrecipRate / countPrecip) : 0,
+                                precipTotal: finalPrecipTotal,
+                                precipRate: finalPrecipRate,
                                 windGust: countWindGust > 0 ? (sumWindGust / countWindGust) : 0
                             }
                         };
@@ -1109,8 +1148,8 @@
                         html += `
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;">
                             <td style="padding: 10px 4px; white-space: nowrap;">${timeStr}</td>
-                            <td style="padding: 10px 4px; font-weight:bold; color: #ffdd00; white-space: nowrap;">${p.temp != null ? p.temp.toFixed(1) + ' °C' : '--'}</td>
-                            <td style="padding: 10px 4px; white-space: nowrap;">${p.humidity != null ? p.humidity + ' %' : '--'}</td>
+                            <td style="padding: 10px 4px; font-weight:bold; color: #ffdd00; white-space: nowrap;">${p.temp != null ? Number(p.temp).toFixed(1) + ' °C' : '--'}</td>
+                            <td style="padding: 10px 4px; white-space: nowrap;">${p.humidity != null ? Math.round(p.humidity) + ' %' : '--'}</td>
                             <td style="padding: 10px 4px; color: #38bdf8; white-space: nowrap;">${p.windSpeed != null ? Number(p.windSpeed).toFixed(1) : '0.0'} km/h</td>
                             <td style="padding: 10px 4px; white-space: nowrap;">${p.pressure != null ? Number(p.pressure).toFixed(1) + ' hPa' : '--'}</td>
                             <td style="padding: 10px 4px; white-space: nowrap;">${p.uv != null ? Number(p.uv).toFixed(1) : '--'}</td>
@@ -1147,8 +1186,8 @@
                         html += `
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(239, 68, 68, 0.15);">
                             <td style="padding: 10px 4px; white-space: nowrap;">${timeStr}</td>
-                            <td style="padding: 10px 4px; font-weight:bold; color: #ffdd00; white-space: nowrap;">${lastPt.temp != null ? lastPt.temp.toFixed(1) + ' °C' : '--'}</td>
-                            <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.humidity != null ? lastPt.humidity + ' %' : '--'}</td>
+                            <td style="padding: 10px 4px; font-weight:bold; color: #ffdd00; white-space: nowrap;">${lastPt.temp != null ? Number(lastPt.temp).toFixed(1) + ' °C' : '--'}</td>
+                            <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.humidity != null ? Math.round(lastPt.humidity) + ' %' : '--'}</td>
                             <td style="padding: 10px 4px; color: #38bdf8; white-space: nowrap;">${lastPt.windSpeed != null ? Number(lastPt.windSpeed).toFixed(1) : '0.0'} km/h</td>
                             <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.pressure != null ? Number(lastPt.pressure).toFixed(1) + ' hPa' : '--'}</td>
                             <td style="padding: 10px 4px; white-space: nowrap;">${lastPt.uv != null ? Number(lastPt.uv).toFixed(1) : '--'}</td>
@@ -1484,7 +1523,7 @@
                 activeDisplayStationKey = key; 
                 forecastPage = 0;
                 const st = STATIONS[activeDisplayStationKey]; 
-                if (st && st.data) { cachedData.displayPws = { ...st.data.metric, ...st.data }; }
+                if (st && st.data) { cachedData.displayPws = { ...st.data.metric, ...st.data, isLocalShower: st.data.isLocalShower }; }
                 
                 try {
                     const newGen = await fetchGeneralConditionsData(st.coords.lat, st.coords.lon);
@@ -1631,7 +1670,7 @@
                 isDayTime = gen.dayOrNight === 'D';
             }
 
-            if (isDayTime && obs.solarRadiation !== undefined) {
+            if (isDayTime && obs.solarRadiation !== undefined && obs.solarRadiation !== null) {
                 let solar = obs.solarRadiation;
                 let uv = obs.uv || 0;
 
@@ -1658,25 +1697,32 @@
             // 4. A VALÓSÁG (Ha tényleg esik a PWS mérő szerint)
             if (obs.precipRate > 0) {
                 isSnowing = obs.temp !== null && obs.temp < 2; 
-                if (isSnowing) {
-                    if (obs.precipRate <= 0.5) { conditionText = "Hószállingózás"; iconClass = "fas fa-snowflake"; }
-                    else if (obs.precipRate <= 1.5) { conditionText = "Gyenge havazás"; iconClass = "fas fa-snowflake"; }
-                    else if (obs.precipRate <= 3.0) { conditionText = "Mérsékelt havazás"; iconClass = "fas fa-snowflake"; }
-                    else if (obs.precipRate <= 6.0) { conditionText = "Erős havazás"; iconClass = "fas fa-snowflake"; }
-                    else { conditionText = "Intenzív hóvihar"; iconClass = "fas fa-snowflake"; }
-                } else if (isZivatar) {
-                    if (obs.precipRate <= 2.0) { conditionText = "Gyenge zivatar"; iconClass = "fas fa-cloud-bolt"; }
-                    else if (obs.precipRate <= 10.0) { conditionText = "Mérsékelt zivatar"; iconClass = "fas fa-cloud-bolt"; }
-                    else if (obs.precipRate <= 25.0) { conditionText = "Heves zivatar"; iconClass = "fas fa-cloud-showers-heavy"; }
-                    else { conditionText = "Károkozó heves zivatar"; iconClass = "fas fa-cloud-showers-heavy"; }
+                
+                // --- LOKÁLIS ZÁPOR FELÜLÍRÁS (QC) ---
+                if (obs.isLocalShower) {
+                    conditionText = isSnowing ? "Lokális hózápor" : "Lokális zápor";
+                    iconClass = isSnowing ? "fas fa-snowflake" : (isDayTime ? "fas fa-cloud-sun-rain" : "fas fa-cloud-moon-rain");
                 } else {
-                    if (obs.precipRate <= 0.5) { conditionText = "Csepergés / Szitálás"; iconClass = "fas fa-cloud-rain"; }
-                    else if (obs.precipRate <= 2.0) { conditionText = "Gyenge eső"; iconClass = "fas fa-cloud-rain"; }
-                    else if (obs.precipRate <= 5.0) { conditionText = "Mérsékelt eső"; iconClass = "fas fa-cloud-rain"; }
-                    else if (obs.precipRate <= 10.0) { conditionText = "Erős eső"; iconClass = "fas fa-cloud-showers-heavy"; }
-                    else if (obs.precipRate <= 25.0) { conditionText = "Zuhogó eső / Zápor"; iconClass = "fas fa-cloud-showers-heavy"; }
-                    else if (obs.precipRate <= 50.0) { conditionText = "Heves zápor / Felhőszakadás"; iconClass = "fas fa-cloud-showers-water"; }
-                    else { conditionText = "Extrém felhőszakadás"; iconClass = "fas fa-cloud-showers-water"; }
+                    if (isSnowing) {
+                        if (obs.precipRate <= 0.5) { conditionText = "Hószállingózás"; iconClass = "fas fa-snowflake"; }
+                        else if (obs.precipRate <= 1.5) { conditionText = "Gyenge havazás"; iconClass = "fas fa-snowflake"; }
+                        else if (obs.precipRate <= 3.0) { conditionText = "Mérsékelt havazás"; iconClass = "fas fa-snowflake"; }
+                        else if (obs.precipRate <= 6.0) { conditionText = "Erős havazás"; iconClass = "fas fa-snowflake"; }
+                        else { conditionText = "Intenzív hóvihar"; iconClass = "fas fa-snowflake"; }
+                    } else if (isZivatar) {
+                        if (obs.precipRate <= 2.0) { conditionText = "Gyenge zivatar"; iconClass = "fas fa-cloud-bolt"; }
+                        else if (obs.precipRate <= 10.0) { conditionText = "Mérsékelt zivatar"; iconClass = "fas fa-cloud-bolt"; }
+                        else if (obs.precipRate <= 25.0) { conditionText = "Heves zivatar"; iconClass = "fas fa-cloud-showers-heavy"; }
+                        else { conditionText = "Károkozó heves zivatar"; iconClass = "fas fa-cloud-showers-heavy"; }
+                    } else {
+                        if (obs.precipRate <= 0.5) { conditionText = "Csepergés / Szitálás"; iconClass = "fas fa-cloud-rain"; }
+                        else if (obs.precipRate <= 2.0) { conditionText = "Gyenge eső"; iconClass = "fas fa-cloud-rain"; }
+                        else if (obs.precipRate <= 5.0) { conditionText = "Mérsékelt eső"; iconClass = "fas fa-cloud-rain"; }
+                        else if (obs.precipRate <= 10.0) { conditionText = "Erős eső"; iconClass = "fas fa-cloud-showers-heavy"; }
+                        else if (obs.precipRate <= 25.0) { conditionText = "Zuhogó eső / Zápor"; iconClass = "fas fa-cloud-showers-heavy"; }
+                        else if (obs.precipRate <= 50.0) { conditionText = "Heves zápor / Felhőszakadás"; iconClass = "fas fa-cloud-showers-water"; }
+                        else { conditionText = "Extrém felhőszakadás"; iconClass = "fas fa-cloud-showers-water"; }
+                    }
                 }
             }
             
