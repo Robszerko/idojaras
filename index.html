@@ -293,13 +293,14 @@
         
         const NYIREGYHAZA_COORDS = { lat: 47.9550, lon: 21.7160 };
         
-        // --- ÁLLOMÁSOK DEFINÍCIÓJA (BELVÁROS = VIRTUÁLIS ÁTLAG) ---
+        // --- ÁLLOMÁSOK DEFINÍCIÓJA (BELVÁROS és BORBÁNYA = VIRTUÁLIS ÁTLAG) ---
         const STATIONS = { 
             BELVAROS: { id: 'VIRT_BELVAROS', name: 'Nyíregyháza belvárosa', displayName: 'Nyíregyháza', displayNameShort: 'Nyíregyháza belvárosa', isVirtual: true, subStations: ['INYREG48', 'INYREG44', 'INYREG56', 'INYREG30', 'INYREG47', 'INYREG55'], coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure', 'solar', 'uv'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true },
             NYIREGYHAZI_UT: { id: 'INYREG26', name: 'Nyíregyházi út', displayName: 'Nyíregyházi út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             KERT_UTCA: { id: 'INYREG37', name: 'Kert utca', displayName: 'Kert u.', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             KOSSUTH: { id: 'INYREG42', name: 'Kossuth út 50', displayName: 'Kossuth út 50', displayNameShort: 'Kossuth út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             SOSTOHEGY: { id: 'INYREG20', name: 'Sóstóhegy (Állatpark)', displayName: 'Sóstóhegy', displayNameShort: 'Sóstóhegy', coords: { lat: 48.00, lon: 21.72 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
+            BORBANYA: { id: 'VIRT_BORBANYA', name: 'Borbánya', displayName: 'Borbánya', displayNameShort: 'Borbánya', isVirtual: true, subStations: ['INYREG27', 'INYREG31', 'INYREG30'], coords: { lat: 47.935, lon: 21.758 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure', 'solar', 'uv'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true },
             OROS_DERUS: { id: 'INYREG35', name: 'Oros Derűs utca', displayName: 'Oros', displayNameShort: 'Oros', coords: { lat: 47.93, lon: 21.79 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: true }, 
             NAGYHALASZ: { id: 'INAGYH4', name: 'Nagyhalász', displayName: 'Nagyhalász', displayNameShort: 'Nagyhalász', coords: { lat: 48.118, lon: 21.759 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: false }, 
             SZAKOLY: { id: 'ISZAKO1', name: 'Szakoly', displayName: 'Szakoly', displayNameShort: 'Szakoly', coords: { lat: 47.818, lon: 21.984 }, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, useLHNY: false },
@@ -330,7 +331,7 @@
         let historyChartInstance = null;
         let windowGlobalHistoryCache =[]; 
 
-        const displayableStations =['BELVAROS', 'NYIREGYHAZI_UT', 'KERT_UTCA', 'KOSSUTH', 'SOSTOHEGY', 'OROS_DERUS', 'NAGYHALASZ', 'SZAKOLY'];
+        const displayableStations =['BELVAROS', 'NYIREGYHAZI_UT', 'KERT_UTCA', 'KOSSUTH', 'SOSTOHEGY', 'BORBANYA', 'OROS_DERUS', 'NAGYHALASZ', 'SZAKOLY'];
 
         const NO_DATA_STRING = 'N/A'; 
         const SNOW_ICON_CODES =[5, 6, 7, 8, 10, 13, 14, 15, 16, 41, 42, 43, 46];
@@ -576,7 +577,7 @@
                             avgWindDir = (Math.atan2(sumU / countWindDir, sumV / countWindDir) * 180 / Math.PI + 360) % 360;
                         }
 
-                        // 2. Csapadék Okos Hibrid Logika - Javított verzió
+                        // 2. Csapadék Okos Hibrid Logika
                         const precipTotals = validObs.map(o => o.metric.precipTotal || 0);
                         const precipRates = validObs.map(o => o.metric.precipRate || 0);
                         
@@ -855,7 +856,21 @@
             }
         }
 
-        // Napi Eseménynapló Generátor Logika (Teljes körűen kibővítve)
+        // --- SEGÉDFÜGGVÉNY: Intervallum összegzése a napi eseménynaplóhoz ---
+        function getSummaryStats(pts) {
+            let min = null, max = null, maxWind = 0, rain = 0;
+            pts.forEach(p => {
+                if (p.temp !== undefined && p.temp !== null) {
+                    if (min === null || p.temp < min) min = p.temp;
+                    if (max === null || p.temp > max) max = p.temp;
+                }
+                if (p.windSpeed !== undefined && p.windSpeed !== null && p.windSpeed > maxWind) maxWind = p.windSpeed;
+                if (p.precipTotal !== undefined && p.precipTotal !== null && p.precipTotal > rain) rain = p.precipTotal;
+            });
+            return { min, max, maxWind, rain };
+        }
+
+        // --- Napi Eseménynapló Generátor Logika (Teljes körűen kibővítve) ---
         function generateDailyLog() {
             let events = [];
             const now = new Date();
@@ -898,36 +913,19 @@
                 });
             }
 
-            // Reggel 6-os kávéhőmérséklet beillesztése éjszakai elemzéssel
+            // --- 06:00 Éjszakai Részletes Összefoglaló ---
             let sixAM = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0).getTime();
             if (now.getTime() >= sixAM) {
-                let nightPoints = todayPoints.filter(p => p.timestamp >= startOfDay && p.timestamp <= sixAM);
-                let minNightT = null;
-                nightPoints.forEach(p => {
-                    if (p.temp != null && (minNightT === null || p.temp < minNightT)) minNightT = p.temp;
-                });
+                let nightPts = todayPoints.filter(p => p.timestamp <= sixAM);
+                let stat = getSummaryStats(nightPts);
                 
-                if (minNightT !== null) {
-                    let nightDesc = "";
-                    if (minNightT <= -5) nightDesc = "Zord, keményen fagyos";
-                    else if (minNightT < 0) nightDesc = "Fagyos";
-                    else if (minNightT < 5) nightDesc = "Kifejezetten hideg";
-                    else if (minNightT < 10) nightDesc = "Hűvös";
-                    else if (minNightT < 15) nightDesc = "Enyhe";
-                    else if (minNightT < 20) nightDesc = "Kellemesen meleg";
-                    else nightDesc = "Trópusi, fülledt";
-
+                if (stat.min !== null) {
+                    let rainText = stat.rain > 0 ? `Az éjszaka csapadékos volt, ${stat.rain.toFixed(1)} mm eső hullott.` : 'Az éjszaka száraz volt, nem volt csapadék.';
+                    let windText = stat.maxWind > 0 ? ` A legerősebb szél ${stat.maxWind.toFixed(1)} km/h volt.` : '';
                     events.push({
                         time: sixAM,
-                        text: `Jó reggelt! ${nightDesc} éjszakánk volt, a minimum hőmérséklet: ${minNightT.toFixed(1)}°C.`,
-                        icon: "fa-mug-hot",
-                        color: "#38bdf8"
-                    });
-                } else {
-                    events.push({
-                        time: sixAM,
-                        text: `Jó reggelt! A reggeli adatgyűjtés folyamatban van.`,
-                        icon: "fa-mug-hot",
+                        text: `☕ Reggeli/Éjszakai összefoglaló: Az éjjel folyamán a hőmérséklet ${stat.min.toFixed(1)}°C-ig süllyedt. ${rainText}${windText}`,
+                        icon: "fa-moon",
                         color: "#38bdf8"
                     });
                 }
@@ -956,8 +954,7 @@
             let rainZones = [1, 5, 10, 20, 30, 50, 100];
             
             let maxUvToday = 0;
-            let uvAlertGiven = 0; // 0: nincs, 1: magas (>=6), 2: extrém (>=8)
-
+            let uvAlertGiven = 0; 
             let lastHumidityLog = 0;
             let lastTempJumpLog = 0;
 
@@ -967,12 +964,10 @@
                     if (p.temp > maxT) maxT = p.temp;
                     if (p.temp < minT) minT = p.temp;
 
-                    // Zónák meghatározása 5 fokonként (-5, 0, 5, 10, 15, 20...)
                     let currentZone = Math.floor(p.temp / 5) * 5; 
                     
                     if (lastTempZone !== null && currentZone !== lastTempZone) {
                         if (currentZone > lastTempZone) {
-                            // Felfelé léptük át a zónát
                             let th = currentZone;
                             let text = `Melegedés: A hőmérséklet átlépte a(z) ${th}°C-ot. 📈`;
                             let color = "#fbbf24";
@@ -983,8 +978,7 @@
 
                             events.push({time: p.timestamp, text: text, icon: "fa-temperature-arrow-up", color: color});
                         } else {
-                            // Lefelé léptük át a zónát
-                            let th = lastTempZone; // Azt a zónát léptük át lefelé, amiben eddig voltunk
+                            let th = lastTempZone; 
                             let text = `Lehűlés: A hőmérséklet ${th}°C alá csökkent. 📉`;
                             let color = "#38bdf8";
                             if (th === 0) { text = `Fagypont alatt: 0°C alá csökkent a hőmérséklet. 🧊`; color = "#a5f3fc"; }
@@ -1004,10 +998,10 @@
                     if (pastPoint && pastPoint.temp !== undefined) {
                         let diff = p.temp - pastPoint.temp;
                         if (diff <= -3.0) {
-                            events.push({time: p.timestamp, text: `Hirtelen lehűlés! ${Math.abs(diff).toFixed(1)}°C-ot esett a hőmérséklet 1 óra alatt.`, icon: "fa-temperature-arrow-down", color: "#67e8f9"});
+                            events.push({time: p.timestamp, text: `Hirtelen lehűlés! ${Math.abs(diff).toFixed(1)}°C-ot esett a hőmérséklet kb 1 óra alatt.`, icon: "fa-temperature-arrow-down", color: "#67e8f9"});
                             lastTempJumpLog = p.timestamp;
                         } else if (diff >= 3.0) {
-                            events.push({time: p.timestamp, text: `Gyors felmelegedés! ${diff.toFixed(1)}°C-ot emelkedett a hőmérséklet 1 óra alatt.`, icon: "fa-temperature-arrow-up", color: "#f87171"});
+                            events.push({time: p.timestamp, text: `Gyors felmelegedés! ${diff.toFixed(1)}°C-ot emelkedett a hőmérséklet kb 1 óra alatt.`, icon: "fa-temperature-arrow-up", color: "#f87171"});
                             lastTempJumpLog = p.timestamp;
                         }
                     }
@@ -1020,7 +1014,7 @@
                             events.push({time: p.timestamp, text: `Erősen fülledt, trópusi levegő (Pára: ${p.humidity}%, Hőm: ${p.temp.toFixed(1)}°C).`, icon: "fa-temperature-high", color: "#fca5a5"});
                             lastHumidityLog = p.timestamp;
                         } else if (p.humidity <= 25 && p.temp >= 15) {
-                            events.push({time: p.timestamp, text: `Kifejezetten száraz levegő (Pára: ${p.humidity}%).`, icon: "fa-leaf", color: "#fcd34d"});
+                            events.push({time: p.timestamp, text: `Kifejezetten száraz levegő (Pára: ${p.humidity}%). Fokozott tűzveszély!`, icon: "fa-leaf", color: "#fcd34d"});
                             lastHumidityLog = p.timestamp;
                         }
                     }
@@ -1061,46 +1055,52 @@
                 }
             });
 
-            // Periodikus Helyzetjelentések 3 óránként (ha épp friss a napló, nem írja be, hogy ne ismételjen)
-            for (let h = 9; h <= 21; h += 3) {
-                if (h === 12) continue; // 12-esnek sajátja van
-                let tMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, 0, 0).getTime();
-                if (now.getTime() >= tMs) {
-                    let cp = todayPoints.slice().reverse().find(p => p.timestamp <= tMs);
-                    if (cp && cp.temp !== undefined) {
-                        let conflict = events.some(e => Math.abs(e.time - tMs) < 1800000 && e.text.includes("Helyzetjelentés"));
-                        if(!conflict) {
-                            events.push({
-                                time: tMs,
-                                text: `${h}:00 Helyzetjelentés: ${cp.temp.toFixed(1)}°C, Pára: ${Math.round(cp.humidity || 0)}%, Szél: ${cp.windSpeed ? cp.windSpeed.toFixed(1) : '0'} km/h.`,
-                                icon: "fa-clock",
-                                color: "#94a3b8"
-                            });
-                        }
-                    }
+            // --- 12:00 Délelőtti Részletes Összefoglaló ---
+            let noonTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0).getTime();
+            if (now.getTime() >= noonTime) {
+                let mornPts = todayPoints.filter(p => p.timestamp <= noonTime);
+                let stat = getSummaryStats(mornPts);
+                if (stat.max !== null) {
+                    let rainText = stat.rain > 0 ? `A délelőtt folyamán eddig ${stat.rain.toFixed(1)} mm csapadék gyűlt össze.` : 'A délelőtt csapadékmentesen telt.';
+                    events.push({
+                        time: noonTime,
+                        text: `☀️ Déli összefoglaló: A nap eddigi részében a levegő ${stat.max.toFixed(1)}°C-ig melegedett fel. ${rainText}`,
+                        icon: "fa-sun",
+                        color: "#ffdd00"
+                    });
                 }
             }
 
-            // 12:00 Déli helyzetjelentés
-            let noonTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0).getTime();
-            if (now.getTime() >= noonTime) {
-                events.push({
-                    time: noonTime,
-                    text: `Déli helyzetjelentés: ${maxT > -99 ? maxT.toFixed(1) : '--'}°C az eddigi maximum.`,
-                    icon: "fa-sun",
-                    color: "#ffdd00"
-                });
+            // --- 18:00 Délutáni/Kora Esti Összefoglaló ---
+            let sixPM = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0).getTime();
+            if (now.getTime() >= sixPM) {
+                let dayPts = todayPoints.filter(p => p.timestamp <= sixPM);
+                let stat = getSummaryStats(dayPts);
+                if (stat.max !== null) {
+                    let rainText = stat.rain > 0 ? `Mai csapadékösszeg eddig: ${stat.rain.toFixed(1)} mm.` : 'Eddig nem volt csapadék a mai napon.';
+                    let windText = stat.maxWind > 30 ? ` A nap folyamán szeles időnk volt, a legerősebb lökés ${stat.maxWind.toFixed(1)} km/h.` : ` Legerősebb széllökés: ${stat.maxWind.toFixed(1)} km/h.`;
+                    events.push({
+                        time: sixPM,
+                        text: `🌆 Kora esti összefoglaló: A mai nappali maximum eddig ${stat.max.toFixed(1)}°C volt.${windText} ${rainText}`,
+                        icon: "fa-city",
+                        color: "#fb923c"
+                    });
+                }
             }
 
-            // 22:00 Napi Záró
-            let tenPM = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 22, 0, 0).getTime();
-            if (now.getTime() >= tenPM) {
-                events.push({
-                    time: tenPM,
-                    text: `Napi Zárás 🌙 | Max: ${maxT > -99 ? maxT.toFixed(1) : '--'}°C | Min: ${minT < 99 ? minT.toFixed(1) : '--'}°C | Csapadék: ${maxRain.toFixed(1)} mm.`,
-                    icon: "fa-clipboard-check",
-                    color: "#4ade80"
-                });
+            // --- 23:50 Napi Záró Jelentés ---
+            let endOfDayTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 50, 0).getTime();
+            if (now.getTime() >= endOfDayTime) {
+                let stat = getSummaryStats(todayPoints);
+                if (stat.min !== null && stat.max !== null) {
+                    let range = stat.max - stat.min;
+                    events.push({
+                        time: endOfDayTime,
+                        text: `🌙 Napi Záró Összefoglaló: A mai napon a hőmérséklet ${stat.min.toFixed(1)}°C és ${stat.max.toFixed(1)}°C között alakult (Hőingás: ${range.toFixed(1)}°C). A napi összes csapadék: ${stat.rain.toFixed(1)} mm. Legerősebb széllökés: ${stat.maxWind.toFixed(1)} km/h. Pihentető jó éjszakát!`,
+                        icon: "fa-clipboard-check",
+                        color: "#4ade80"
+                    });
+                }
             }
 
             // Élő riasztások és környékbeli állomások pásztázása
@@ -1145,22 +1145,37 @@
                 }
             }
 
-            // Előrejelzés figyelmeztető (Mai napra komoly csapadékesély van-e hátra)
+            // Részletes Előrejelzés figyelmeztető csapadékhoz
             if (forecastCache[stKey] && forecastCache[stKey].hourly) {
                 let remainingToday = forecastCache[stKey].hourly.filter(h => {
                     let ht = new Date(h.time).getTime();
-                    return ht > now.getTime() && ht < tenPM;
+                    return ht > now.getTime() && ht < startOfDay + 86400000;
                 });
-                let highChance = remainingToday.find(h => h.precipChance > 50);
+                let highChance = remainingToday.find(h => h.precipChance > 30);
                 if (highChance) {
-                    events.push({ time: now.getTime(), text: `Előrejelzés: Később ${formatHourOnly(highChance.time)} körül csapadék várható.`, icon: "fa-clock", color: "var(--precip-color)" });
+                    let chance = highChance.precipChance;
+                    let qpfTotal = (highChance.qpf || 0) + (highChance.qpfSnow || 0);
+                    let isSnow = SNOW_ICON_CODES.includes(highChance.iconCode);
+                    let desc = getPrecipIntensityDescription(qpfTotal, isSnow);
+                    
+                    let amountStr = "";
+                    if (qpfTotal > 0) {
+                        amountStr = ` Várható intenzitás: ${desc.toLowerCase()} (~${qpfTotal.toFixed(1)} ${isSnow ? 'cm' : 'mm'}).`;
+                    }
+
+                    events.push({ 
+                        time: now.getTime(), 
+                        text: `Előrejelzés: Később, ${formatHourOnly(highChance.time)} körül csapadék várható (${chance}% esély).${amountStr}`, 
+                        icon: "fa-clock", 
+                        color: "var(--precip-color)" 
+                    });
                 }
             }
 
             // Időrendbe szedés
             events.sort((a,b) => a.time - b.time);
 
-            // Intelligens duplikáció szűrés (Hogy ne spammelje tele a logot hasonló szöveggel túl sűrűn)
+            // Intelligens duplikáció szűrés
             let uniqueEvents = [];
             events.forEach(e => {
                 let isDuplicate = uniqueEvents.some(u => u.text === e.text && (e.time - u.time) < 2 * 60 * 60 * 1000);
