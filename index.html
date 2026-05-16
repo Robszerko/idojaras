@@ -306,7 +306,7 @@
         
         // --- ÁLLOMÁSOK DEFINÍCIÓJA ---
         const STATIONS = { 
-            BELVAROS: { id: 'VIRT_BELVAROS', name: 'Nyíregyháza belvárosa', displayName: 'Nyíregyháza', displayNameShort: 'Nyíregyháza belvárosa', isVirtual: true, subStations: ['INYREG48', 'INYREG44', 'INYREG56', 'INYREG30', 'INYREG47', 'INYREG55'], coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure', 'solar', 'uv'], isOnline: false, data: null, lastRainTimestamp: null, computedLastRainTimestamp: null, isCurrentlyRaining: false, useLHNY: true },
+            BELVAROS: { id: 'VIRT_BELVAROS', name: 'Nyíregyháza belvárosa', displayName: 'Nyíregyháza', displayNameShort: 'Nyíregyháza belvárosa', isVirtual: true, subStations: ['INYREG56', 'INYREG42', 'INYREG51', 'INYREG48'], coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure', 'solar', 'uv'], isOnline: false, data: null, lastRainTimestamp: null, computedLastRainTimestamp: null, isCurrentlyRaining: false, useLHNY: true },
             NYIREGYHAZI_UT: { id: 'INYREG26', name: 'Nyíregyházi út', displayName: 'Nyíregyházi út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'precip', 'wind', 'humidity', 'pressure'], isOnline: false, data: null, lastRainTimestamp: null, computedLastRainTimestamp: null, isCurrentlyRaining: false, useLHNY: true }, 
             KERT_UTCA: { id: 'INYREG37', name: 'Kert utca', displayName: 'Kert u.', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null, computedLastRainTimestamp: null, isCurrentlyRaining: false, useLHNY: true }, 
             KOSSUTH: { id: 'INYREG42', name: 'Kossuth út 50', displayName: 'Kossuth út 50', displayNameShort: 'Kossuth út', coords: NYIREGYHAZA_COORDS, provides:['temp', 'wind', 'humidity', 'solar', 'uv', 'pressure', 'precip'], isOnline: false, data: null, lastRainTimestamp: null, computedLastRainTimestamp: null, isCurrentlyRaining: false, useLHNY: true }, 
@@ -391,7 +391,7 @@
         }
 
         function getPrecipIntensityDescription(rate, isSnow) {
-            if (rate == null || rate <= 0) return 'Nincs csapadék';
+            if (rate == null || rate < 0.1) return 'Nincs csapadék'; // JAVÍTVA
             if (isSnow) {
                 if (rate <= 0.5) return 'Hószállingózás'; 
                 if (rate <= 1.5) return 'Gyenge havazás'; 
@@ -434,8 +434,46 @@
             return '#ff3333'; 
         }
         
-        function mapIconCodeToHungarianText(iconCode, dayOrNight) { const isDay = dayOrNight === 'D'; const textMap = { 32: 'Napos', 36: 'Napos', 31: 'Tiszta ég', 33: 'Tiszta ég', 34: isDay ? 'Részben napos' : 'Részben felhős', 29: isDay ? 'Részben napos' : 'Részben felhős', 30: isDay ? 'Részben napos' : 'Részben felhős', 27: 'Felhős', 28: 'Felhős', 26: 'Borult', 11: 'Zápor', 12: 'Zápor', 40: 'Zápor', 39: isDay ? 'Zápor' : 'Éjjeli zápor', 45: isDay ? 'Zápor' : 'Éjjeli zápor', 3: 'Zivatar', 4: 'Zivatar', 37: 'Zivatar', 38: 'Zivatar', 47: 'Zivatar', 5: 'Havas eső', 6: 'Ónos eső', 7: 'Havas eső', 8: 'Ónos eső', 10: 'Ónos eső', 18: 'Havas eső', 13: 'Hózápor', 14: 'Hózápor', 15: 'Hófúvás', 16: 'Havazás', 41: 'Havazás', 42: 'Havazás', 43: 'Hófúvás', 46: 'Hózápor', 9: 'Permet / Szitálás', 19: 'Por', 20: 'Köd', 21: 'Pára', 22: 'Füst', 23: 'Szeles', 24: 'Szeles' }; return textMap[iconCode] || 'Ismeretlen'; }
-        function mapTwcIconToFontAwesome(iconCode, dayOrNight) { const isDay = dayOrNight === 'D'; const iconMap = { 32:'fas fa-sun',36:'fas fa-sun',31:'fas fa-moon',33:'fas fa-moon',34:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',29:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',30:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',27:'fas fa-cloud',28:'fas fa-cloud',26:'fas fa-cloud',11:'fas fa-cloud-showers-heavy',12:'fas fa-cloud-showers-heavy',40:'fas fa-cloud-showers-heavy',39:isDay ?'fas fa-cloud-sun-rain':'fas fa-cloud-moon-rain',45:isDay ?'fas fa-cloud-sun-rain':'fas fa-cloud-moon-rain',3:'fas fa-cloud-bolt',4:'fas fa-cloud-bolt',37:'fas fa-cloud-bolt',38:'fas fa-cloud-bolt',47:'fas fa-cloud-bolt',5:'fas fa-snowflake',6:'fas fa-snowflake',7:'fas fa-snowflake',8:'fas fa-snowflake',10:'fas fa-cloud-sleet',18:'fas fa-smog',13:'fas fa-snowflake',14:'fas fa-snowflake',15:'fas fa-snowflake',16:'fas fa-snowflake',41:'fas fa-snowflake',42:'fas fa-snowflake',43:'fas fa-snowflake',46:'fas fa-snowflake',9:'fas fa-cloud-rain',19:'fas fa-smog',20:'fas fa-smog',21:'fas fa-smog',22:'fas fa-smog',23:'fas fa-wind',24:'fas fa-wind' }; return iconMap[iconCode] || 'fas fa-question-circle'; }
+        function mapIconCodeToHungarianText(iconCode, dayOrNight) { 
+            const isDay = dayOrNight === 'D'; 
+            const textMap = { 
+                32: 'Napos', 36: 'Napos', 31: 'Derült', 33: 'Gyengén felhős', 
+                34: 'Gyengén felhős', 29: 'Részben felhős', 30: 'Részben felhős', 
+                27: 'Erősen felhős', 28: 'Erősen felhős', 26: 'Borult', 
+                11: 'Zápor', 12: 'Zápor', 40: 'Zápor', 39: isDay ? 'Zápor' : 'Éjjeli zápor', 
+                45: isDay ? 'Zápor' : 'Éjjeli zápor', 3: 'Zivatar', 4: 'Zivatar', 37: 'Zivatar', 
+                38: 'Zivatar', 47: 'Zivatar', 5: 'Havas eső', 6: 'Ónos eső', 7: 'Havas eső', 
+                8: 'Ónos eső', 10: 'Ónos eső', 18: 'Havas eső', 13: 'Hózápor', 14: 'Hózápor', 
+                15: 'Hófúvás', 16: 'Havazás', 41: 'Havazás', 42: 'Havazás', 43: 'Hófúvás', 
+                46: 'Hózápor', 9: 'Permet / Szitálás', 19: 'Por', 20: 'Köd', 21: 'Pára', 
+                22: 'Füst', 23: 'Szeles', 24: 'Szeles' 
+            }; 
+            return textMap[iconCode] || 'Ismeretlen'; 
+        }
+
+        function mapTwcIconToFontAwesome(iconCode, dayOrNight) { 
+            const isDay = dayOrNight === 'D'; 
+            const iconMap = { 
+                32:'fas fa-sun',36:'fas fa-sun',31:'fas fa-moon',33:'fas fa-cloud-moon',
+                34:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',
+                29:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',
+                30:isDay ?'fas fa-cloud-sun':'fas fa-cloud-moon',
+                27:'fas fa-cloud',28:'fas fa-cloud',26:'fas fa-cloud',
+                11:'fas fa-cloud-showers-heavy',12:'fas fa-cloud-showers-heavy',40:'fas fa-cloud-showers-heavy',
+                39:isDay ?'fas fa-cloud-sun-rain':'fas fa-cloud-moon-rain',
+                45:isDay ?'fas fa-cloud-sun-rain':'fas fa-cloud-moon-rain',
+                3:'fas fa-cloud-bolt',4:'fas fa-cloud-bolt',37:'fas fa-cloud-bolt',
+                38:'fas fa-cloud-bolt',47:'fas fa-cloud-bolt',
+                5:'fas fa-snowflake',6:'fas fa-cloud-meatball',7:'fas fa-snowflake',
+                8:'fas fa-cloud-meatball',10:'fas fa-cloud-meatball',18:'fas fa-smog',
+                13:'fas fa-snowflake',14:'fas fa-snowflake',15:'fas fa-snowflake',
+                16:'fas fa-snowflake',41:'fas fa-snowflake',42:'fas fa-snowflake',
+                43:'fas fa-snowflake',46:'fas fa-snowflake',9:'fas fa-cloud-rain',
+                19:'fas fa-smog',20:'fas fa-smog',21:'fas fa-smog',22:'fas fa-smog',
+                23:'fas fa-wind',24:'fas fa-wind' 
+            }; 
+            return iconMap[iconCode] || 'fas fa-question-circle'; 
+        }
 
         function parseMetarToHungarian(metarObj, isDay) {
             if (!metarObj) return null;
@@ -486,13 +524,12 @@
                     case 'BKN': phrase = "Erősen felhős"; iconClass = "fas fa-cloud"; break;
                     case 'SCT': phrase = "Részben felhős"; iconClass = isDay ? "fas fa-cloud-sun" : "fas fa-cloud-moon"; break;
                     case 'FEW': phrase = "Gyengén felhős"; iconClass = isDay ? "fas fa-cloud-sun" : "fas fa-cloud-moon"; break;
-                    case 'CLR': case 'SKC': default: phrase = isDay ? "Derült" : "Tiszta ég"; iconClass = isDay ? "fas fa-sun" : "fas fa-moon"; break;
+                    case 'CLR': case 'SKC': default: phrase = isDay ? "Napos" : "Derült"; iconClass = isDay ? "fas fa-sun" : "fas fa-moon"; break;
                 }
             }
             return { phrase, iconClass, isSnowing, isZivatar, isEmergency };
         }
 
-        // Segédfüggvény a medián számításhoz (QC)
         function getMedian(arr) {
             if(arr.length === 0) return 0;
             const sorted = [...arr].sort((a,b) => a - b);
@@ -598,12 +635,14 @@
                         const precipTotals = validObs.map(o => o.metric.precipTotal || 0);
                         const precipRates = validObs.map(o => o.metric.precipRate || 0);
                         
-                        const wetRates = precipRates.filter(r => r > 0);
+                        // JAVÍTÁS: Küszöbérték a csapadék intenzitásra
+                        const wetRates = precipRates.filter(r => r >= 0.1);
                         let finalPrecipRate = 0;
                         let isLocalShower = false;
 
                         if (wetRates.length > 0) {
-                            finalPrecipRate = wetRates.reduce((a, b) => a + b, 0) / wetRates.length; 
+                            // JAVÍTÁS: Osztás n-nel (az összes állomás átlaga, hogy 1 hiba ne rontsa el a virtuálist)
+                            finalPrecipRate = precipRates.reduce((a, b) => a + b, 0) / n; 
                             if (wetRates.length < Math.ceil(n / 2)) isLocalShower = true;
                         }
 
@@ -628,7 +667,7 @@
 
                         stationConfig.isOnline = true;
                         stationConfig.data = avgObs;
-                        if (avgObs.metric.precipRate > 0) stationConfig.lastRainTimestamp = latestTime;
+                        if (avgObs.metric.precipRate >= 0.1) stationConfig.lastRainTimestamp = latestTime;
                     } else {
                         stationConfig.isOnline = false;
                     }
@@ -645,7 +684,7 @@
                     const obs = data.observations[0]; 
                     stationConfig.isOnline = true; 
                     stationConfig.data = obs; 
-                    if (obs.metric.precipRate > 0) stationConfig.lastRainTimestamp = new Date(obs.obsTimeLocal).getTime(); 
+                    if (obs.metric.precipRate >= 0.1) stationConfig.lastRainTimestamp = new Date(obs.obsTimeLocal).getTime(); 
                 } catch (error) { 
                     stationConfig.isOnline = false; 
                 }
@@ -747,10 +786,10 @@
                 
                 stPoints.forEach(pt => {
                     let r = pt.precipRate || 0;
-                    if (r > 0) {
+                    if (r >= 0.1) {
                         isRaining = true;
                         lastRainTs = null;
-                    } else if (isRaining && r === 0) {
+                    } else if (isRaining && r < 0.1) {
                         isRaining = false;
                         lastRainTs = pt.timestamp;
                     }
@@ -946,10 +985,12 @@
             let maxCapeToday = 0;
             if (forecastCache[stKey] && forecastCache[stKey].cape) {
                 const cd = forecastCache[stKey].cape;
-                for(let i=0; i<cd.time.length; i++) {
-                    let ct = new Date(cd.time[i]).getTime();
-                    if (ct >= startOfDay && ct <= startOfDay + 86400000) {
-                        if (cd.cape[i] > maxCapeToday) maxCapeToday = cd.cape[i];
+                if(cd && cd.time) {
+                    for(let i=0; i<cd.time.length; i++) {
+                        let ct = new Date(cd.time[i]).getTime();
+                        if (ct >= startOfDay && ct <= startOfDay + 86400000) {
+                            if (cd.cape[i] > maxCapeToday) maxCapeToday = cd.cape[i];
+                        }
                     }
                 }
             }
@@ -973,7 +1014,7 @@
                 let stat = getSummaryStats(nightPts);
                 
                 if (stat.min !== null) {
-                    let rainText = stat.rain > 0 ? `Az éjszaka csapadékos volt, ${stat.rain.toFixed(1)} mm eső hullott.` : 'Az éjszaka száraz volt, nem volt csapadék.';
+                    let rainText = stat.rain >= 0.1 ? `Az éjszaka csapadékos volt, ${stat.rain.toFixed(1)} mm eső hullott.` : 'Az éjszaka száraz volt, nem volt csapadék.';
                     let windText = stat.maxWind > 0 ? ` A legerősebb szél ${stat.maxWind.toFixed(1)} km/h volt.` : '';
                     events.push({
                         time: sixAM,
@@ -1105,7 +1146,7 @@
                 let mornPts = todayPoints.filter(p => p.timestamp <= noonTime);
                 let stat = getSummaryStats(mornPts);
                 if (stat.max !== null) {
-                    let rainText = stat.rain > 0 ? `A délelőtt folyamán eddig ${stat.rain.toFixed(1)} mm csapadék gyűlt össze.` : 'A délelőtt csapadékmentesen telt.';
+                    let rainText = stat.rain >= 0.1 ? `A délelőtt folyamán eddig ${stat.rain.toFixed(1)} mm csapadék gyűlt össze.` : 'A délelőtt csapadékmentesen telt.';
                     events.push({
                         time: noonTime,
                         text: `☀️ Déli összefoglaló: A nap eddigi részében a levegő ${stat.max.toFixed(1)}°C-ig melegedett fel. ${rainText}`,
@@ -1120,7 +1161,7 @@
                 let dayPts = todayPoints.filter(p => p.timestamp <= sixPM);
                 let stat = getSummaryStats(dayPts);
                 if (stat.max !== null) {
-                    let rainText = stat.rain > 0 ? `Mai csapadékösszeg eddig: ${stat.rain.toFixed(1)} mm.` : 'Eddig nem volt csapadék a mai napon.';
+                    let rainText = stat.rain >= 0.1 ? `Mai csapadékösszeg eddig: ${stat.rain.toFixed(1)} mm.` : 'Eddig nem volt csapadék a mai napon.';
                     let windText = stat.maxWind > 30 ? ` A nap folyamán szeles időnk volt, a legerősebb lökés ${stat.maxWind.toFixed(1)} km/h.` : ` Legerősebb széllökés: ${stat.maxWind.toFixed(1)} km/h.`;
                     events.push({
                         time: sixPM,
@@ -1149,7 +1190,7 @@
             Object.keys(STATIONS).forEach(k => {
                 if (k !== stKey && STATIONS[k].isOnline && STATIONS[k].data) {
                     let rate = STATIONS[k].data.metric.precipRate;
-                    if (rate > 0) rainingOthers.push(STATIONS[k].displayNameShort || STATIONS[k].displayName);
+                    if (rate >= 0.1) rainingOthers.push(STATIONS[k].displayNameShort || STATIONS[k].displayName);
                 }
             });
             if (rainingOthers.length > 0) {
@@ -1198,7 +1239,7 @@
                     let desc = getPrecipIntensityDescription(qpfTotal, isSnow);
                     
                     let amountStr = "";
-                    if (qpfTotal > 0) {
+                    if (qpfTotal >= 0.1) {
                         amountStr = ` Várható intenzitás: ${desc.toLowerCase()} (~${qpfTotal.toFixed(1)} ${isSnow ? 'cm' : 'mm'}).`;
                     }
 
@@ -1255,23 +1296,31 @@
 
             let events =[];
             let currentEvent = null;
-            let prevTotal = 0;
+            
+            // JAVÍTÁS: Nem 0-ról indulunk, hanem a legelső kapott elem csapadékértékéről.
+            // Ezzel kiküszöböljük a betöltéskori hamis "ugrást" a csapadékösszegben.
+            let prevTotal = allStationPoints.length > 0 ? (allStationPoints[0].precipTotal || 0) : 0;
             let offset = 0; 
 
             for (let i = 0; i < allStationPoints.length; i++) {
                 let p = allStationPoints[i];
                 let rawTotal = p.precipTotal || 0;
                 
+                let oldOffset = offset;
                 if (rawTotal < prevTotal - 0.5) {
                     offset += prevTotal;
                 }
                 let continuousTotal = rawTotal + offset;
-                let inc = continuousTotal - (prevTotal + offset);
-                if (inc < 0) inc = 0;
+                
+                // JAVÍTÁS: A legelső pontnál tilos inkrementumot (inc) generálni!
+                let inc = (i === 0) ? 0 : continuousTotal - (prevTotal + oldOffset);
+                if (inc < 0.1) inc = 0; // JAVÍTÁS: Kiszűrjük a < 0.1 mm-es "zajt" is.
+                
                 prevTotal = rawTotal;
                 
                 let rate = p.precipRate || 0;
-                let isRainingNow = rate > 0 || inc > 0;
+                // JAVÍTÁS: Csak valós (>0.1mm) mérés számít esőnek
+                let isRainingNow = rate >= 0.1 || inc > 0;
                 
                 if (isRainingNow) {
                     if (!currentEvent) {
@@ -1539,7 +1588,7 @@
                     p.displayPrecip = preciseDailyAcc;
                     
                     let rate = p.precipRate || 0;
-                    let isRainingForward = (rate > 0 || diff > 0);
+                    let isRainingForward = (rate >= 0.1 || diff >= 0.1);
                     
                     if (isRainingForward) {
                         p.rainState = 'raining';
@@ -1572,7 +1621,7 @@
                         const timeStr = new Date(p.timestamp).toLocaleTimeString('hu-HU', {hour: '2-digit', minute:'2-digit'});
                         
                         let precipValToShow = p.displayPrecip !== undefined ? p.displayPrecip : (p.precipTotal || 0);
-                        let precipHtml = `<span style="${precipValToShow > 0 ? 'color: var(--precip-color); font-weight: bold;' : ''}">${precipValToShow.toFixed(1)} mm</span>`;
+                        let precipHtml = `<span style="${precipValToShow >= 0.1 ? 'color: var(--precip-color); font-weight: bold;' : ''}">${precipValToShow.toFixed(1)} mm</span>`;
                         
                         if (p.rainState === 'raining') {
                             let isSnow = p.temp !== null && p.temp < 2;
@@ -1610,7 +1659,7 @@
                         
                         const timeStr = new Date(lastPt.timestamp).toLocaleTimeString('hu-HU', {hour: '2-digit', minute:'2-digit'});
                         let precipValToShow = lastPt.displayPrecip !== undefined ? lastPt.displayPrecip : (lastPt.precipTotal || 0);
-                        let precipHtml = `<span style="${precipValToShow > 0 ? 'color: var(--precip-color); font-weight: bold;' : ''}">${precipValToShow.toFixed(1)} mm</span>`;
+                        let precipHtml = `<span style="${precipValToShow >= 0.1 ? 'color: var(--precip-color); font-weight: bold;' : ''}">${precipValToShow.toFixed(1)} mm</span>`;
                         
                         if (lastPt.rainState === 'raining') {
                             let isSnow = lastPt.temp !== null && lastPt.temp < 2;
@@ -2172,7 +2221,7 @@
             }
 
             const isApiRaining = /eső|zápor|szitálás|zivatar|havaz|permet|felhőszakad|hófúvás|hó|jég|csapadék/i.test(conditionText);
-            if (isApiRaining && (!obs.precipRate || obs.precipRate === 0) && !isMetarEmergency) {
+            if (isApiRaining && (!obs.precipRate || obs.precipRate < 0.1) && !isMetarEmergency) {
                 conditionText = "Felhős"; 
                 iconClass = gen.dayOrNight === 'D' ? "fas fa-cloud-sun" : "fas fa-cloud-moon";
                 
@@ -2223,7 +2272,7 @@
                 }
             }
 
-            if (obs.precipRate > 0 && !isMetarEmergency) {
+            if (obs.precipRate >= 0.1 && !isMetarEmergency) {
                 isSnowing = obs.temp !== null && obs.temp < 2; 
                 
                 if (obs.isLocalShower) {
@@ -2310,7 +2359,7 @@
             if (withRain.length > 0) {
                 let html = '';
                 withRain.forEach(s => {
-                    const raining = s.isCurrentlyRaining || s.data.metric.precipRate > 0;
+                    const raining = s.isCurrentlyRaining || (s.data && s.data.metric.precipRate >= 0.1);
                     const cClass = raining ? 'precip-badge raining' : 'precip-badge';
                     
                     let isSnow = false;
