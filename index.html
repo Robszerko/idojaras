@@ -133,19 +133,41 @@
         .mm-val { font-weight: 800; color: #fff; text-align: right; flex-grow: 1;}
         .mm-time { font-size: 10px; color: var(--current-accent); font-weight: 700; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 6px; flex-shrink: 0;}
 
-        /* CSS az Élő Csapadék Napló és Eseménynapló harmonika/görgető funkciójához */
-        .rain-event-closed .rain-event-details { display: none; }
-        .rain-event-closed.expanded .rain-event-details { display: flex; }
-        .rain-event-closed.expanded .expand-icon { transform: rotate(180deg); }
-        #live-rain-log-content { overflow-x: hidden; }
-
+        /* --- PROFI TIMELINE A CSAPADÉKNAPLÓHOZ ÉS ESEMÉNYEKHEZ --- */
         .scrollable-details::-webkit-scrollbar { width: 4px; }
-        .scrollable-details::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
-        .scrollable-details::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+        .scrollable-details::-webkit-scrollbar-track { background: transparent; border-radius: 4px; }
+        .scrollable-details::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        .scrollable-details::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
 
-        #live-rain-log-content::-webkit-scrollbar { width: 4px; }
-        #live-rain-log-content::-webkit-scrollbar-track { background: transparent; }
-        #live-rain-log-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        .rain-timeline { display: flex; flex-direction: column; gap: 10px; position: relative; padding-left: 14px; margin-top: 5px; margin-bottom: 5px; }
+        .rain-timeline::before { content: ''; position: absolute; top: 8px; bottom: 8px; left: 4px; width: 2px; background: rgba(255,255,255,0.1); border-radius: 2px; }
+        
+        .rain-timeline-item { position: relative; display: flex; flex-direction: column; background: rgba(0,0,0,0.25); border: 1px solid var(--current-glass-border); border-radius: 8px; transition: all 0.2s ease; }
+        .rain-timeline-item:hover { border-color: rgba(255,255,255,0.2); background: rgba(0,0,0,0.35); }
+        .rain-timeline-item.ongoing { border-color: rgba(56, 189, 248, 0.5); background: rgba(56, 189, 248, 0.1); }
+        
+        .rain-timeline-marker { position: absolute; top: 12px; left: -14px; width: 10px; height: 10px; border-radius: 50%; background: #64748b; border: 2px solid #0f172a; z-index: 2; transition: all 0.3s ease; }
+        .rain-timeline-item.ongoing .rain-timeline-marker { background: var(--precip-color); box-shadow: 0 0 10px var(--precip-color); border-color: rgba(0,0,0,0.5); animation: pulseMarker 1.5s infinite alternate; }
+        @keyframes pulseMarker { from { transform: scale(0.9); opacity: 0.8; } to { transform: scale(1.2); opacity: 1; } }
+
+        .rain-timeline-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; cursor: pointer; user-select: none; }
+        .rain-timeline-time { font-size: 11px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+        .rain-timeline-item.ongoing .rain-timeline-time { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+        .rain-timeline-amount { font-size: 13px; font-weight: 800; color: var(--precip-color); }
+        .rain-timeline-icon { font-size: 10px; color: var(--text-secondary); transition: transform 0.3s ease; }
+        .rain-timeline-item.expanded .rain-timeline-icon { transform: rotate(180deg); }
+
+        .rain-timeline-details { display: none; padding: 0 10px 8px 10px; border-top: 1px dashed rgba(255,255,255,0.05); margin-top: 2px; }
+        .rain-timeline-item.expanded .rain-timeline-details { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .rain-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 10px; color: rgba(255,255,255,0.8); }
+        .rain-detail-row:last-child { border-bottom: none; }
+        .rain-detail-time { font-weight: 700; color: var(--text-secondary); width: 45px; flex-shrink: 0; }
+        .rain-detail-desc { flex-grow: 1; text-align: left; padding-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rain-detail-val { font-weight: 800; color: var(--text-primary); flex-shrink: 0; }
+
+        .rain-day-divider { text-align: center; font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--precip-snow-color); letter-spacing: 1px; padding: 4px 0; background: rgba(0,0,0,0.2); border-radius: 4px; margin: 4px 0; }
 
         /* METRICS ROW */
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; width: 100%; }
@@ -391,7 +413,7 @@
         }
 
         function getPrecipIntensityDescription(rate, isSnow) {
-            if (rate == null || rate < 0.1) return 'Nincs csapadék'; // JAVÍTVA
+            if (rate == null || rate < 0.1) return 'Nincs csapadék'; 
             if (isSnow) {
                 if (rate <= 0.5) return 'Hószállingózás'; 
                 if (rate <= 1.5) return 'Gyenge havazás'; 
@@ -635,13 +657,11 @@
                         const precipTotals = validObs.map(o => o.metric.precipTotal || 0);
                         const precipRates = validObs.map(o => o.metric.precipRate || 0);
                         
-                        // JAVÍTÁS: Küszöbérték a csapadék intenzitásra
                         const wetRates = precipRates.filter(r => r >= 0.1);
                         let finalPrecipRate = 0;
                         let isLocalShower = false;
 
                         if (wetRates.length > 0) {
-                            // JAVÍTÁS: Osztás n-nel (az összes állomás átlaga, hogy 1 hiba ne rontsa el a virtuálist)
                             finalPrecipRate = precipRates.reduce((a, b) => a + b, 0) / n; 
                             if (wetRates.length < Math.ceil(n / 2)) isLocalShower = true;
                         }
@@ -1289,6 +1309,7 @@
             container.scrollTop = container.scrollHeight; 
         }
 
+        // --- ÚJ, PROFI TIMELINE RENDERER FANTOM ESŐ SZŰRÉSSEL ---
         function renderLiveRainLog(allStationPoints) {
             const logBox = document.getElementById('live-rain-log-content');
             const totalBox = document.getElementById('live-rain-log-total');
@@ -1297,8 +1318,7 @@
             let events =[];
             let currentEvent = null;
             
-            // JAVÍTÁS: Nem 0-ról indulunk, hanem a legelső kapott elem csapadékértékéről.
-            // Ezzel kiküszöböljük a betöltéskori hamis "ugrást" a csapadékösszegben.
+            // Phantom eső megelőzése: nem nulláról indul, hanem a kezdeti adatbázis pontból
             let prevTotal = allStationPoints.length > 0 ? (allStationPoints[0].precipTotal || 0) : 0;
             let offset = 0; 
 
@@ -1312,14 +1332,12 @@
                 }
                 let continuousTotal = rawTotal + offset;
                 
-                // JAVÍTÁS: A legelső pontnál tilos inkrementumot (inc) generálni!
                 let inc = (i === 0) ? 0 : continuousTotal - (prevTotal + oldOffset);
-                if (inc < 0.1) inc = 0; // JAVÍTÁS: Kiszűrjük a < 0.1 mm-es "zajt" is.
+                if (inc < 0.1) inc = 0; 
                 
                 prevTotal = rawTotal;
                 
                 let rate = p.precipRate || 0;
-                // JAVÍTÁS: Csak valós (>0.1mm) mérés számít esőnek
                 let isRainingNow = rate >= 0.1 || inc > 0;
                 
                 if (isRainingNow) {
@@ -1346,7 +1364,7 @@
                         };
                     }
                     
-                    let desc = rate > 0 ? getPrecipIntensityDescription(rate, currentEvent.isSnow).toLowerCase() : (currentEvent.isSnow ? 'hószállingózás' : 'csepergés');
+                    let desc = rate > 0 ? getPrecipIntensityDescription(rate, currentEvent.isSnow) : (currentEvent.isSnow ? 'Hószállingózás' : 'Csepergés');
                     let accRain = continuousTotal - currentEvent.startTotal;
                     
                     currentEvent.changes.push({ time: p.timestamp, desc: desc, val: accRain });
@@ -1386,7 +1404,9 @@
                 return; 
             }
 
-            let html = '';
+            // Timeline felépítése
+            let html = '<div class="rain-timeline">';
+            
             displayEvents.forEach(ev => {
                 let startTimeStr = formatEventTime(ev.start);
                 let endTimeStr = ev.end ? formatEventTime(ev.end) : "Folyamatban";
@@ -1397,48 +1417,51 @@
                 ev.changes.forEach(ch => {
                     let chDay = new Date(ch.time).getDate();
                     if (chDay !== lastDay) {
-                        detailsHtml += `<div style="text-align:center; padding: 4px 0; margin: 4px 0; border-top: 1px dashed rgba(255,255,255,0.2); border-bottom: 1px dashed rgba(255,255,255,0.2); font-weight: bold; color: var(--precip-snow-color);">--- Napváltás / Éjfél ---</div>`;
+                        detailsHtml += `<div class="rain-day-divider">Éjfél</div>`;
                         lastDay = chDay;
                     }
                     detailsHtml += `
-                        <div style="display:flex; justify-content:space-between; color: rgba(255,255,255,0.8); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 3px;">
-                            <span>${formatHourOnly(ch.time)} - ${ch.desc}</span>
-                            <strong>${Number(ch.val).toFixed(1)} mm</strong>
+                        <div class="rain-detail-row">
+                            <span class="rain-detail-time">${formatHourOnly(ch.time)}</span>
+                            <span class="rain-detail-desc">${ch.desc}</span>
+                            <span class="rain-detail-val">${Number(ch.val).toFixed(1)} mm</span>
                         </div>
                     `;
                 });
 
-                if (ev.end) {
-                    html += `
-                    <div class="rain-event-closed" onclick="this.classList.toggle('expanded')" style="background:rgba(0,0,0,0.25); border-radius:6px; border-left: 2px solid var(--precip-color); margin-bottom: 5px; cursor: pointer; overflow: hidden; transition: all 0.3s ease;">
-                        <div style="display:flex; justify-content:space-between; padding:6px 8px; align-items: center; user-select: none;">
-                            <span><i class="fas fa-chevron-down expand-icon" style="margin-right:6px; font-size:10px; transition: transform 0.3s; color: var(--current-accent);"></i>${startTimeStr} - ${endTimeStr}</span>
-                            <strong>${Number(ev.totalRain).toFixed(1)} mm</strong>
+                let isExpanded = ev.end === null ? 'expanded' : '';
+                let stateClass = ev.end === null ? 'ongoing' : 'completed';
+                let timeDisplay = ev.end === null ? `${startTimeStr} óta` : `${startTimeStr} - ${endTimeStr}`;
+                let iconClass = ev.end === null ? 'fa-cloud-showers-heavy' : 'fa-check-circle';
+                
+                html += `
+                    <div class="rain-timeline-item ${stateClass} ${isExpanded}">
+                        <div class="rain-timeline-marker"></div>
+                        <div class="rain-timeline-header" onclick="this.parentElement.classList.toggle('expanded')">
+                            <div class="rain-timeline-time"><i class="fas ${iconClass}"></i> ${timeDisplay}</div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div class="rain-timeline-amount">${Number(ev.totalRain).toFixed(1)} mm</div>
+                                <i class="fas fa-chevron-down rain-timeline-icon"></i>
+                            </div>
                         </div>
-                        <div class="rain-event-details scrollable-details" style="flex-direction:column; gap:4px; background:rgba(255,255,255,0.05); padding:6px 8px; font-size:10px; border-top: 1px solid rgba(255,255,255,0.05); max-height: 150px; overflow-y: auto;">
-                            ${detailsHtml}
+                        <div class="rain-timeline-details">
+                            <div class="scrollable-details" style="max-height: 120px; overflow-y: auto; padding-right: 4px;">
+                                ${detailsHtml}
+                            </div>
                         </div>
-                    </div>`;
-                } else {
-                    html += `<div style="display:flex; flex-direction:column; gap:4px; background:rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding:6px 8px; border-radius:6px; margin-bottom: 5px;">`;
-                    html += `
-                        <div style="display:flex; justify-content:space-between; font-weight: bold; color: #fff; margin-bottom: 4px; font-size:12px;">
-                            <span><i class="fas fa-cloud-showers-heavy"></i> Folyamatban (${startTimeStr} óta)</span>
-                            <span style="color:var(--text-primary)">${Number(ev.totalRain).toFixed(1)} mm</span>
-                        </div>
-                    `;
-                    html += `<div class="scrollable-details" style="max-height: 150px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 4px;">`;
-                    html += detailsHtml;
-                    html += `</div></div>`;
-                }
+                    </div>
+                `;
             });
+            html += '</div>';
 
             logBox.innerHTML = html;
             totalBox.textContent = (displayDailyTotal || 0).toFixed(1) + ' mm';
             
+            // Automatikus leugrás a legújabb (legalsó) elemhez a fő konténerben
             logBox.scrollTop = logBox.scrollHeight;
             
-            const innerScrolls = logBox.querySelectorAll('.scrollable-details');
+            // Automatikus leugrás az aktív (lenyitott) beágyazott görgetőknél is
+            const innerScrolls = logBox.querySelectorAll('.rain-timeline-item.expanded .scrollable-details');
             if (innerScrolls.length > 0) {
                 const lastInner = innerScrolls[innerScrolls.length - 1];
                 lastInner.scrollTop = lastInner.scrollHeight;
@@ -1814,11 +1837,11 @@
                         
                         <!-- 1. ÉLŐ CSAPADÉK NAPLÓ (Csak eső idején látszik) -->
                         <div id="rain-log-container" class="daily-stat-box is-hidden" style="height: 290px; justify-content: space-between; border-color: var(--precip-color); box-shadow: 0 0 15px rgba(56, 189, 248, 0.15); background: rgba(0, 30, 50, 0.3); max-width: 100%;">
-                            <div class="stat-box-title" style="margin-bottom: 4px;"><i class="fas fa-list-ul" style="color:var(--precip-color)"></i> Élő Csapadék Napló</div>
-                            <div id="live-rain-log-content" style="flex-grow: 1; height: 210px; max-height: 210px; overflow-y: auto; padding-right: 5px; display:flex; flex-direction:column;">
-                                <!-- Ide generálódik a lenyíló eső esemény lista -->
+                            <div class="stat-box-title" style="margin-bottom: 4px; flex-shrink: 0;"><i class="fas fa-list-ul" style="color:var(--precip-color)"></i> Élő Csapadék Napló</div>
+                            <div id="live-rain-log-content" class="scrollable-details" style="flex-grow: 1; min-height: 0; overflow-y: auto; padding-right: 5px; position: relative;">
+                                <!-- Ide generálódik a timeline eső esemény lista -->
                             </div>
-                            <div style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; display:flex; justify-content:space-between; font-size:13px; font-weight:800;">
+                            <div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; display:flex; justify-content:space-between; font-size:13px; font-weight:800; flex-shrink: 0;">
                                 <span>Összesen ma (éjféltől):</span>
                                 <span id="live-rain-log-total" style="color:var(--precip-color);">0.0 mm</span>
                             </div>
@@ -1826,11 +1849,11 @@
 
                         <!-- 2. NAPI ESEMÉNYNAPLÓ (Ha nem esik az eső, ez látszik helyette, szigorúan kötött magassággal) -->
                         <div id="daily-log-container" class="daily-stat-box" style="height: 290px; justify-content: space-between; max-width: 100%;">
-                            <div class="stat-box-title" style="margin-bottom: 4px;"><i class="fas fa-stream" style="color:#fbbf24"></i> Napi Eseménynapló</div>
-                            <div id="daily-event-log-content" class="scrollable-details" style="flex-grow: 1; height: 210px; max-height: 210px; overflow-y: auto; overflow-x: hidden; padding-right: 4px; display:flex; flex-direction:column;">
+                            <div class="stat-box-title" style="margin-bottom: 4px; flex-shrink: 0;"><i class="fas fa-stream" style="color:#fbbf24"></i> Napi Eseménynapló</div>
+                            <div id="daily-event-log-content" class="scrollable-details" style="flex-grow: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-right: 4px; position: relative;">
                                 <!-- Ide jönnek a dinamikus soros bejegyzések közvetlenül a cím alá -->
                             </div>
-                            <div style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; display:flex; justify-content:space-between; font-size:13px; font-weight:800; color:var(--text-secondary);">
+                            <div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; display:flex; justify-content:space-between; font-size:13px; font-weight:800; color:var(--text-secondary); flex-shrink: 0;">
                                 <span>Napló állapota:</span>
                                 <span id="daily-log-status" style="color:var(--current-accent);">Aktív folyamat</span>
                             </div>
